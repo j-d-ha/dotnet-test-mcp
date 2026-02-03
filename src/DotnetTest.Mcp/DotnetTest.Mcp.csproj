@@ -8,6 +8,10 @@
         <Nullable>enable</Nullable>
         <PublishAot>true</PublishAot>
         <InvariantGlobalization>true</InvariantGlobalization>
+        <TrimmerSingleWarn>false</TrimmerSingleWarn>
+        <SelfContained>true</SelfContained>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
 </Project>
