@@ -1,3 +1,18 @@
-﻿// See https://aka.ms/new-console-template for more information
+using DotnetTest.Mcp;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
-Console.WriteLine("Hello, World!");
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.AddConsole(consoleLogOptions =>
+{
+    consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
+});
+
+
+builder.Services
+    .AddMcpServer()
+    .WithStdioServerTransport()
+    .WithTools<EchoTool>();
+
+await builder.Build().RunAsync();
