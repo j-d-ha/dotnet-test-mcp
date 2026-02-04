@@ -14,5 +14,8 @@ tasks:
 
   inspect:
     desc: Run MCP Inspector against the local server
+    env:
+      WORKING_DIRECTORY: "{{.HOME}}/Repos/CSharp/dynamodb-efcore-provider"
     cmds:
+      - dotnet build -c Release
       - npx -y @modelcontextprotocol/inspector dotnet run --project src/DotnetTest.Mcp -c Release

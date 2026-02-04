@@ -206,3 +206,7 @@ Tools are discovered from the server assembly.
 - Keep builds green: `dotnet build` and `dotnet test` should pass.
 - When adding new files, place production code under `src/` and tests under
   `tests/`.
+
+## Docs
+
+- MTP Dotnet Test Arguments: ./docs/DotnetTestCommands.md
