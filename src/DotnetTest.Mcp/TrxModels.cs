@@ -8,304 +8,304 @@ namespace DotnetTest.Mcp.Trx;
 public partial class TrxTestRun
 {
     [XmlField("id")]
-    public string? m_id;
+    public string? Id;
 
     [XmlField("name")]
-    public string? m_name;
+    public string? Name;
 
     [XmlField("runUser")]
-    public string? m_runUser;
+    public string? RunUser;
 
     [XmlField("xmlns")]
-    public string? m_xmlns;
+    public string? Xmlns;
 
     [XmlBody("Times")]
-    public TrxTimes? m_times;
+    public TrxTimes? Times;
 
     [XmlBody("TestSettings")]
-    public TrxTestSettings? m_testSettings;
+    public TrxTestSettings? TestSettings;
 
     [XmlBody("Results")]
-    public TrxResults? m_results;
+    public TrxResults? Results;
 
     [XmlBody("TestDefinitions")]
-    public TrxTestDefinitions? m_testDefinitions;
+    public TrxTestDefinitions? TestDefinitions;
 
     [XmlBody("TestEntries")]
-    public TrxTestEntries? m_testEntries;
+    public TrxTestEntries? TestEntries;
 
     [XmlBody("TestLists")]
-    public TrxTestLists? m_testLists;
+    public TrxTestLists? TestLists;
 
     [XmlBody("ResultSummary")]
-    public TrxResultSummary? m_resultSummary;
+    public TrxResultSummary? ResultSummary;
 }
 
 [XmlCls("Times")]
 public partial class TrxTimes
 {
     [XmlField("creation")]
-    public string? m_creation;
+    public string? Creation;
 
     [XmlField("queuing")]
-    public string? m_queuing;
+    public string? Queuing;
 
     [XmlField("start")]
-    public string? m_start;
+    public string? Start;
 
     [XmlField("finish")]
-    public string? m_finish;
+    public string? Finish;
 }
 
 [XmlCls("TestSettings")]
 public partial class TrxTestSettings
 {
     [XmlField("name")]
-    public string? m_name;
+    public string? Name;
 
     [XmlField("id")]
-    public string? m_id;
+    public string? Id;
 }
 
 [XmlCls("Results")]
 public partial class TrxResults
 {
     [XmlBody("UnitTestResult")]
-    public List<TrxUnitTestResult> m_unitTestResults = new();
+    public List<TrxUnitTestResult> UnitTestResults = new();
 }
 
 [XmlCls("UnitTestResult")]
 public partial class TrxUnitTestResult
 {
     [XmlField("testName")]
-    public string? m_testName;
+    public string? TestName;
 
     [XmlField("outcome")]
-    public string? m_outcome;
+    public string? Outcome;
 
     [XmlField("testType")]
-    public string? m_testType;
+    public string? TestType;
 
     [XmlField("testListId")]
-    public string? m_testListId;
+    public string? TestListId;
 
     [XmlField("testId")]
-    public string? m_testId;
+    public string? TestId;
 
     [XmlField("executionId")]
-    public string? m_executionId;
+    public string? ExecutionId;
 
     [XmlField("computerName")]
-    public string? m_computerName;
+    public string? ComputerName;
 
     [XmlField("duration")]
-    public string? m_duration;
+    public string? Duration;
 
     [XmlField("startTime")]
-    public string? m_startTime;
+    public string? StartTime;
 
     [XmlField("endTime")]
-    public string? m_endTime;
+    public string? EndTime;
 
     [XmlBody("Output")]
-    public TrxOutput? m_output;
+    public TrxOutput? Output;
 }
 
 [XmlCls("Output")]
 public partial class TrxOutput
 {
     [XmlBody("ErrorInfo")]
-    public TrxErrorInfo? m_errorInfo;
+    public TrxErrorInfo? ErrorInfo;
 
     [XmlBody("StdOut")]
-    public TrxStdOut? m_stdOut;
+    public TrxStdOut? StdOut;
 
     [XmlBody("StdErr")]
-    public TrxStdErr? m_stdErr;
+    public TrxStdErr? StdErr;
 }
 
 [XmlCls("ErrorInfo")]
 public partial class TrxErrorInfo
 {
     [XmlBody("Message")]
-    public TrxMessage? m_message;
+    public TrxMessage? Message;
 
     [XmlBody("StackTrace")]
-    public TrxStackTrace? m_stackTrace;
+    public TrxStackTrace? StackTrace;
 }
 
 [XmlCls("Message")]
 public partial class TrxMessage
 {
     [XmlBody]
-    public string? m_value;
+    public string? Value;
 }
 
 [XmlCls("StackTrace")]
 public partial class TrxStackTrace
 {
     [XmlBody]
-    public string? m_value;
+    public string? Value;
 }
 
 [XmlCls("StdOut")]
 public partial class TrxStdOut
 {
     [XmlBody]
-    public string? m_value;
+    public string? Value;
 }
 
 [XmlCls("StdErr")]
 public partial class TrxStdErr
 {
     [XmlBody]
-    public string? m_value;
+    public string? Value;
 }
 
 [XmlCls("TestDefinitions")]
 public partial class TrxTestDefinitions
 {
     [XmlBody("UnitTest")]
-    public List<TrxUnitTest> m_unitTests = new();
+    public List<TrxUnitTest> UnitTests = new();
 }
 
 [XmlCls("UnitTest")]
 public partial class TrxUnitTest
 {
     [XmlField("name")]
-    public string? m_name;
+    public string? Name;
 
     [XmlField("id")]
-    public string? m_id;
+    public string? Id;
 
     [XmlField("storage")]
-    public string? m_storage;
+    public string? Storage;
 
     [XmlBody("Execution")]
-    public TrxExecution? m_execution;
+    public TrxExecution? Execution;
 
     [XmlBody("TestMethod")]
-    public TrxTestMethod? m_testMethod;
+    public TrxTestMethod? TestMethod;
 }
 
 [XmlCls("Execution")]
 public partial class TrxExecution
 {
     [XmlField("id")]
-    public string? m_id;
+    public string? Id;
 }
 
 [XmlCls("TestMethod")]
 public partial class TrxTestMethod
 {
     [XmlField("codeBase")]
-    public string? m_codeBase;
+    public string? CodeBase;
 
     [XmlField("className")]
-    public string? m_className;
+    public string? ClassName;
 
     [XmlField("name")]
-    public string? m_name;
+    public string? Name;
 
     [XmlField("adapterTypeName")]
-    public string? m_adapterTypeName;
+    public string? AdapterTypeName;
 }
 
 [XmlCls("TestEntries")]
 public partial class TrxTestEntries
 {
     [XmlBody("TestEntry")]
-    public List<TrxTestEntry> m_testEntries = new();
+    public List<TrxTestEntry> TestEntries = new();
 }
 
 [XmlCls("TestEntry")]
 public partial class TrxTestEntry
 {
     [XmlField("testListId")]
-    public string? m_testListId;
+    public string? TestListId;
 
     [XmlField("testId")]
-    public string? m_testId;
+    public string? TestId;
 
     [XmlField("executionId")]
-    public string? m_executionId;
+    public string? ExecutionId;
 }
 
 [XmlCls("TestLists")]
 public partial class TrxTestLists
 {
     [XmlBody("TestList")]
-    public List<TrxTestList> m_testLists = new();
+    public List<TrxTestList> TestLists = new();
 }
 
 [XmlCls("TestList")]
 public partial class TrxTestList
 {
     [XmlField("name")]
-    public string? m_name;
+    public string? Name;
 
     [XmlField("id")]
-    public string? m_id;
+    public string? Id;
 }
 
 [XmlCls("ResultSummary")]
 public partial class TrxResultSummary
 {
     [XmlField("outcome")]
-    public string? m_outcome;
+    public string? Outcome;
 
     [XmlBody("Counters")]
-    public TrxCounters? m_counters;
+    public TrxCounters? Counters;
 }
 
 [XmlCls("Counters")]
 public partial class TrxCounters
 {
     [XmlField("total")]
-    public int m_total;
+    public int Total;
 
     [XmlField("executed")]
-    public int m_executed;
+    public int Executed;
 
     [XmlField("passed")]
-    public int m_passed;
+    public int Passed;
 
     [XmlField("failed")]
-    public int m_failed;
+    public int Failed;
 
     [XmlField("error")]
-    public int m_error;
+    public int Error;
 
     [XmlField("timeout")]
-    public int m_timeout;
+    public int Timeout;
 
     [XmlField("aborted")]
-    public int m_aborted;
+    public int Aborted;
 
     [XmlField("inconclusive")]
-    public int m_inconclusive;
+    public int Inconclusive;
 
     [XmlField("passedButRunAborted")]
-    public int m_passedButRunAborted;
+    public int PassedButRunAborted;
 
     [XmlField("notRunnable")]
-    public int m_notRunnable;
+    public int NotRunnable;
 
     [XmlField("notExecuted")]
-    public int m_notExecuted;
+    public int NotExecuted;
 
     [XmlField("disconnected")]
-    public int m_disconnected;
+    public int Disconnected;
 
     [XmlField("warning")]
-    public int m_warning;
+    public int Warning;
 
     [XmlField("completed")]
-    public int m_completed;
+    public int Completed;
 
     [XmlField("inProgress")]
-    public int m_inProgress;
+    public int InProgress;
 
     [XmlField("pending")]
-    public int m_pending;
+    public int Pending;
 }
