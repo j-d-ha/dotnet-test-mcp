@@ -9,10 +9,6 @@ builder.Logging.AddConsole(consoleLogOptions =>
     consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
 });
 
-
-builder.Services
-    .AddMcpServer()
-    .WithStdioServerTransport()
-    .WithTools<EchoTool>();
+builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<TestTool>();
 
 await builder.Build().RunAsync();

@@ -11,3 +11,8 @@ tasks:
     cmds:
       - echo "{{.GREETING}}"
     silent: true
+
+  inspect:
+    desc: Run MCP Inspector against the local server
+    cmds:
+      - npx -y @modelcontextprotocol/inspector dotnet run --project src/DotnetTest.Mcp -c Release
