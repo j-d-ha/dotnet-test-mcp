@@ -4,11 +4,14 @@ using DotnetTest.Mcp;
 using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
 using DotnetTest.Mcp.Tools;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+
+builder.Configuration.AddEnvironmentVariables();
 
 builder.Logging.AddConsole(consoleLogOptions =>
 {
