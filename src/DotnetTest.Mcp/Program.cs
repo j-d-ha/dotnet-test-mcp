@@ -27,6 +27,7 @@ builder.Services
     .WithStdioServerTransport()
     .WithTools<GetWorkingDirectoryTool>(jsonOptions)
     .WithTools<ListTestProjectsTool>(jsonOptions)
+    .WithTools<ListTestsTool>(jsonOptions)
     .WithTools<RunSingleTestTool>(jsonOptions);
 
 await builder.Build().RunAsync();
@@ -38,6 +39,7 @@ await builder.Build().RunAsync();
 [JsonSerializable(
     typeof(ListTestProjectsTool.Result),
     TypeInfoPropertyName = "ListTestProjectsToolResult")]
+[JsonSerializable(typeof(ListTestsTool.Result), TypeInfoPropertyName = "ListTestsToolResult")]
 [JsonSerializable(
     typeof(RunSingleTestTool.Result),
     TypeInfoPropertyName = "RunSingleTestToolResult")]
