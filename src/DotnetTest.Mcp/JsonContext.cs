@@ -30,6 +30,8 @@ namespace DotnetTest.Mcp;
 [JsonSerializable(typeof(ErrorKind), TypeInfoPropertyName = "ErrorKind")]
 [JsonSerializable(typeof(ErrorInfo), TypeInfoPropertyName = "ErrorInfo")]
 [JsonSerializable(typeof(TestFailure), TypeInfoPropertyName = "TestFailure")]
+[JsonSerializable(typeof(ProjectAttempt), TypeInfoPropertyName = "ProjectAttempt")]
+[JsonSerializable(typeof(ProjectDiscoveryResult), TypeInfoPropertyName = "ProjectDiscoveryResult")]
 [JsonSerializable(typeof(TruncatedText), TypeInfoPropertyName = "TruncatedText")]
 [JsonSerializable(typeof(CtrfReport), TypeInfoPropertyName = "CtrfReport")]
 public partial class JsonContext : JsonSerializerContext;

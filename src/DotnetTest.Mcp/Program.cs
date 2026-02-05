@@ -26,7 +26,7 @@ builder.Services.AddSingleton(jsonOptions);
 builder.Services
     .AddMcpServer(options => options.ScopeRequests = true)
     .WithStdioServerTransport()
-    .WithTools<GetWorkingDirectoryTool>(jsonOptions)
+    // .WithTools<GetWorkingDirectoryTool>(jsonOptions)
     .WithTools<ListTestProjectsTool>(jsonOptions)
     .WithTools<ListTestsTool>(jsonOptions)
     .WithTools<ListTestsSummaryTool>(jsonOptions)

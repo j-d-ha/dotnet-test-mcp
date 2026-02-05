@@ -9,4 +9,5 @@ public enum ErrorKind
     TestHostCrashed,
     BuildFailed,
     DiscoveryFailed,
+    NoTestsDiscovered,
 }

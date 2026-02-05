@@ -98,6 +98,12 @@ internal static class CtrfTestRun
             || ContainsErrorToken(output, "error MSB"))
             return ErrorKind.BuildFailed;
 
+        if (ContainsErrorToken(output, "Discovered 0 tests")
+            || ContainsErrorToken(output, "No tests available")
+            || ContainsErrorToken(output, "No test is available")
+            || ContainsErrorToken(output, "No tests to run"))
+            return ErrorKind.NoTestsDiscovered;
+
         if (ContainsErrorToken(output, "Test discovery")
             || ContainsErrorToken(output, "Discovering tests")
             || ContainsErrorToken(output, "Failed to discover tests"))

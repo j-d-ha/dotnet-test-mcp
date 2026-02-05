@@ -15,19 +15,11 @@ public sealed class ListTestProjectsTool(IOptions<McpOptions> options, ICommandR
     [Description("Lists test projects in the solution.")]
     public async Task<Result> ListTestProjects(CancellationToken cancellationToken)
     {
-        var result = await _commandRunner.RunAsync(
-            new CommandRequest("dotnet", "sln", "list"),
+        var testProjects = await TestProjectDiscovery.ListAsync(
+            _commandRunner,
+            _options,
             cancellationToken);
-
-        if (result.StandardOutputLines.FirstOrDefault() is not "Project(s)")
-            throw new InvalidOperationException(
-                $"dotnet sln list failed: Unexpected output: {result.StandardOutput.Trim()}");
-
-        return new Result(
-            result.StandardOutputLines
-                .Skip(2)
-                .Where(x => x.StartsWith(_options.TestsDirectoryName, StringComparison.Ordinal))
-                .ToArray());
+        return new Result(testProjects);
     }
 
     [Description("Result containing discovered test project paths.")]
