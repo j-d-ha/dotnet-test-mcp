@@ -54,6 +54,9 @@ public sealed class RunSingleTestTool(
         {
             if (!File.Exists(fullCtrfPath))
             {
+                if (commandResult.ExitCode == 8)
+                    return CreateResult(TestOutcome.NotFound, "No tests matched the filter.");
+
                 var commandSummary = BuildCommandSummary(commandResult);
                 return CreateResult(
                     TestOutcome.Error,

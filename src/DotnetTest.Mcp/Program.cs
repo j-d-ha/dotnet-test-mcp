@@ -28,7 +28,10 @@ builder.Services
     .WithTools<GetWorkingDirectoryTool>(jsonOptions)
     .WithTools<ListTestProjectsTool>(jsonOptions)
     .WithTools<ListTestsTool>(jsonOptions)
-    .WithTools<RunSingleTestTool>(jsonOptions);
+    .WithTools<RunSingleTestTool>(jsonOptions)
+    .WithTools<RunAllTestsTool>(jsonOptions)
+    .WithTools<RunAllTestsForProjectTool>(jsonOptions)
+    .WithTools<RunAllTestsInClassTool>(jsonOptions);
 
 await builder.Build().RunAsync();
 
@@ -43,5 +46,12 @@ await builder.Build().RunAsync();
 [JsonSerializable(
     typeof(RunSingleTestTool.Result),
     TypeInfoPropertyName = "RunSingleTestToolResult")]
+[JsonSerializable(typeof(RunAllTestsTool.Result), TypeInfoPropertyName = "RunAllTestsToolResult")]
+[JsonSerializable(
+    typeof(RunAllTestsForProjectTool.Result),
+    TypeInfoPropertyName = "RunAllTestsForProjectToolResult")]
+[JsonSerializable(
+    typeof(RunAllTestsInClassTool.Result),
+    TypeInfoPropertyName = "RunAllTestsInClassToolResult")]
 [JsonSerializable(typeof(CtrfReport), TypeInfoPropertyName = "CtrfReport")]
 public partial class JsonContext : JsonSerializerContext;
