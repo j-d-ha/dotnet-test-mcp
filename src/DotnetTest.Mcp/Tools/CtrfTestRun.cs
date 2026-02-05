@@ -81,6 +81,13 @@ internal static class CtrfTestRun
             return ErrorKind.ReadFailed;
 
         var output = BuildOutputCombined(commandResult);
+        if (ContainsErrorToken(
+                output,
+                "Specifying a project for 'dotnet test' should be via '--project'")
+            || ContainsErrorToken(output, "Unrecognized command or argument")
+            || ContainsErrorToken(output, "Unknown option"))
+            return ErrorKind.InvocationError;
+
         if (ContainsErrorToken(output, "testhost")
             || ContainsErrorToken(output, "TypeLoadException")
             || ContainsErrorToken(output, "Unhandled exception"))

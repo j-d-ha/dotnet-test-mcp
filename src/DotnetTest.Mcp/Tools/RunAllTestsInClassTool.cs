@@ -53,7 +53,10 @@ public sealed class RunAllTestsInClassTool(
 
         var arguments = new List<string> { "test" };
         if (trimmedProjectPath is not null)
+        {
+            arguments.Add("--project");
             arguments.Add(trimmedProjectPath);
+        }
 
         arguments.Add("--filter-class");
         arguments.Add(trimmedClassName);

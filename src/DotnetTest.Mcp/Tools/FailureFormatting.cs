@@ -88,8 +88,7 @@ internal static class FailureFormatting
         string? diffContext = null;
         if (options.DetailLevel is FailureDetailLevel.DiffSnippet or FailureDetailLevel.Full)
             (diffSummary, diffContext) = ExtractDiff(
-                test.Message,
-                test.Snippet,
+                test,
                 options.TopLineMaxChars,
                 options.MaxFailureChars,
                 options.MaxFailureLines);
@@ -134,17 +133,18 @@ internal static class FailureFormatting
     }
 
     private static (string? Summary, string? Context) ExtractDiff(
-        string? message,
-        string? snippet,
+        CtrfTest test,
         int maxSummaryChars,
         int maxContextChars,
         int maxContextLines)
     {
         string? diffContext = null;
-        if (!string.IsNullOrWhiteSpace(snippet))
-            diffContext = TextTruncation.Truncate(snippet, maxContextChars, maxContextLines)?.Text;
+        if (!string.IsNullOrWhiteSpace(test.Snippet))
+            diffContext =
+                TextTruncation.Truncate(test.Snippet, maxContextChars, maxContextLines)?.Text;
 
-        if (string.IsNullOrWhiteSpace(message))
+        var sourceLines = BuildDiffLines(test);
+        if (sourceLines.Count == 0)
             return (null, diffContext);
 
         string? expected = null;
@@ -152,9 +152,7 @@ internal static class FailureFormatting
         var diffLines = new List<string>();
         var captureDiff = false;
 
-        using var reader = new StringReader(message);
-        string? line;
-        while ((line = reader.ReadLine()) is not null)
+        foreach (var line in sourceLines)
         {
             var trimmed = line.Trim();
             if (expected is null
@@ -206,7 +204,61 @@ internal static class FailureFormatting
             diffContext = TextTruncation.Truncate(diffText, maxContextChars, maxContextLines)?.Text;
         }
 
+        if (diffContext is null && summary is null)
+        {
+            var excerpt = ExtractExcerpt(sourceLines, maxContextLines);
+            diffContext = TextTruncation.Truncate(excerpt, maxContextChars, maxContextLines)?.Text;
+        }
+
         return (summary, diffContext);
+    }
+
+    private static List<string> BuildDiffLines(CtrfTest test)
+    {
+        var lines = new List<string>();
+        AddLines(lines, test.Message);
+        AddLines(lines, test.Stderr);
+        AddLines(lines, test.Stdout);
+        return lines;
+    }
+
+    private static void AddLines(List<string> lines, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        using var reader = new StringReader(text);
+        string? line;
+        while ((line = reader.ReadLine()) is not null)
+            lines.Add(line);
+    }
+
+    private static void AddLines(List<string> lines, IReadOnlyCollection<string> entries)
+    {
+        if (entries.Count == 0)
+            return;
+
+        foreach (var entry in entries)
+            AddLines(lines, entry);
+    }
+
+    private static string ExtractExcerpt(List<string> lines, int maxLines)
+    {
+        if (lines.Count == 0)
+            return string.Empty;
+
+        var excerptLines = new List<string>();
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+
+            excerptLines.Add(line.Trim());
+            if (excerptLines.Count >= Math.Max(1, maxLines))
+                break;
+        }
+
+        return string.Join("\n", excerptLines);
     }
 
     private static string TrimToMax(string value, int maxChars)

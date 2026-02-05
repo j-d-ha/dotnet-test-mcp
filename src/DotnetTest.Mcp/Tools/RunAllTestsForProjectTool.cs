@@ -51,7 +51,7 @@ public sealed class RunAllTestsForProjectTool(
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
             _jsonOptions,
-            new[] { "test", trimmedProjectPath },
+            new[] { "test", "--project", trimmedProjectPath },
             cancellationToken);
 
         if (runResult.Report is null)

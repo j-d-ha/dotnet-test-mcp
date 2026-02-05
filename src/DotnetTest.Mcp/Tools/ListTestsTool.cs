@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
 using ModelContextProtocol.Server;
 
@@ -13,6 +14,8 @@ public sealed class ListTestsTool(ICommandRunner commandRunner)
     [Description("Lists all discovered tests for the solution or a project.")]
     public async Task<Result> ListTests(
         [Description("Optional path to project file to scope listing.")] string? projectPath = null,
+        [Description("When true, treat zero discovered tests as an error.")] bool requireTests =
+            false,
         CancellationToken cancellationToken = default)
     {
         var trimmedProjectPath = string.IsNullOrWhiteSpace(projectPath) ? null : projectPath.Trim();
@@ -40,7 +43,66 @@ public sealed class ListTestsTool(ICommandRunner commandRunner)
             cancellationToken);
 
         var tests = TestListParser.ExtractTests(commandResult.StandardOutputLines);
-        return new Result(scope, trimmedProjectPath, tests.Length, tests);
+        var exitCode = commandResult.ExitCode;
+        if (exitCode != 0)
+        {
+            var errorKind = CtrfTestRun.ClassifyErrorKind(commandResult, true, null);
+            var error = CtrfTestRun.BuildErrorInfo(
+                commandResult,
+                null,
+                OutputMode.Summary,
+                errorKind);
+            return new Result(
+                scope,
+                trimmedProjectPath,
+                TestOutcome.Error,
+                error.Summary,
+                exitCode,
+                tests.Length,
+                tests,
+                error);
+        }
+
+        if (tests.Length == 0)
+        {
+            if (requireTests)
+            {
+                var error = CtrfTestRun.BuildErrorInfo(
+                    commandResult,
+                    "No tests discovered.",
+                    OutputMode.Summary,
+                    ErrorKind.DiscoveryFailed);
+                return new Result(
+                    scope,
+                    trimmedProjectPath,
+                    TestOutcome.Error,
+                    error.Summary,
+                    exitCode,
+                    0,
+                    tests,
+                    error);
+            }
+
+            return new Result(
+                scope,
+                trimmedProjectPath,
+                TestOutcome.NotFound,
+                "No tests discovered.",
+                exitCode,
+                0,
+                tests,
+                null);
+        }
+
+        return new Result(
+            scope,
+            trimmedProjectPath,
+            TestOutcome.Passed,
+            $"Discovered {tests.Length} tests.",
+            exitCode,
+            tests.Length,
+            tests,
+            null);
     }
 
     [Description("Result containing discovered test names.")]
@@ -48,7 +110,12 @@ public sealed class ListTestsTool(ICommandRunner commandRunner)
         [property: Description("Scope used to list tests: solution or project.")] string Scope,
         [property: Description("Project path used when Scope is project; otherwise null.")]
         string? ProjectPath,
+        [property: Description("Outcome of the discovery run.")] TestOutcome Outcome,
+        [property: Description("Short summary (<= 1-2 lines).")] string Message,
+        [property: Description("Process exit code from dotnet test.")] int ExitCode,
         [property: Description("Number of discovered tests.")] int TestCount,
         [property: Description("Fully qualified test names returned by the test adapter.")]
-        string[] Tests);
+        string[] Tests,
+        [property: Description("Structured error details when Outcome is Error; otherwise null.")]
+        ErrorInfo? Error);
 }

@@ -17,10 +17,11 @@ internal static class TestListParser
             if (IsNoiseLine(trimmed))
                 continue;
 
-            if (!LooksLikeTestName(trimmed))
+            var candidate = ExtractCandidate(trimmed);
+            if (!LooksLikeTestName(candidate))
                 continue;
 
-            tests.Add(trimmed);
+            tests.Add(candidate);
         }
 
         return tests.Distinct(StringComparer.Ordinal)
@@ -96,7 +97,16 @@ internal static class TestListParser
         return false;
     }
 
+    private static string ExtractCandidate(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+            return string.Empty;
+
+        var firstToken = line.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+
+        return firstToken ?? string.Empty;
+    }
+
     private static bool LooksLikeTestName(string line)
-        => line.Contains('.', StringComparison.Ordinal)
-            && !line.Contains(' ', StringComparison.Ordinal);
+        => line.Contains('.', StringComparison.Ordinal);
 }
