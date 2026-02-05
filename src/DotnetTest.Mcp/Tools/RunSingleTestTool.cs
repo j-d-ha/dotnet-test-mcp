@@ -13,8 +13,6 @@ public sealed class RunSingleTestTool(
     JsonSerializerOptions jsonOptions,
     ILogger<RunSingleTestTool> logger)
 {
-    private const int MaxFailureTextLength = 4000;
-
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions.ValidateNotNull();
     private readonly ILogger<RunSingleTestTool> _logger = logger.ValidateNotNull();
@@ -28,7 +26,16 @@ public sealed class RunSingleTestTool(
             Example: MyNamespace.MyClass.MyMethod
             """)]
         string qualifiedTestName,
-        CancellationToken cancellationToken)
+        [Description("Output mode: summary or verbose.")] OutputMode outputMode =
+            OutputMode.Summary,
+        [Description(
+            "Include stack traces in failure details. Defaults to false in summary, true in verbose.")]
+        bool? includeStackTrace = null,
+        [Description("Maximum characters to include for failure message/trace.")]
+        int? maxFailureChars = null,
+        [Description("Maximum lines to include for failure message/trace.")] int? maxFailureLines =
+            null,
+        CancellationToken cancellationToken = default)
     {
         var ctrfFileName = $"TestResults_{Guid.NewGuid():N}.ctrf";
 
@@ -76,8 +83,14 @@ public sealed class RunSingleTestTool(
             if (results.Count == 0)
                 return CreateResult(TestOutcome.NotFound, "No tests matched the filter.");
 
+            var outputOptions = FailureFormatting.CreateOptions(
+                outputMode,
+                includeStackTrace,
+                maxFailureChars,
+                maxFailureLines);
+
             if (results.Count == 1)
-                return CreateResultFromTest(results[0]);
+                return CreateResultFromTest(results[0], outputOptions);
 
             var matchingResults = results.Where(test
                     => string.Equals(test.Name, qualifiedTestName, StringComparison.Ordinal))
@@ -91,7 +104,7 @@ public sealed class RunSingleTestTool(
                     TestOutcome.Ambiguous,
                     "Filter matched multiple test cases; refine the qualified name.");
 
-            return CreateResultFromTest(matchingResults[0]);
+            return CreateResultFromTest(matchingResults[0], outputOptions);
         }
         catch (OperationCanceledException)
         {
@@ -111,26 +124,42 @@ public sealed class RunSingleTestTool(
             string message,
             int? durationMilliseconds = null,
             string? failureMessage = null,
-            string? failureStackTrace = null)
+            string? failureStackTrace = null,
+            TestFailure? failure = null)
             => new(
                 qualifiedTestName,
                 outcome,
                 message,
                 durationMilliseconds,
                 failureMessage,
-                failureStackTrace);
+                failureStackTrace,
+                failure);
 
-        Result CreateResultFromTest(CtrfTest singleResult)
+        Result CreateResultFromTest(
+            CtrfTest singleResult,
+            FailureFormatting.FailureOutputOptions outputOptions)
         {
             var outcome = MapOutcome(singleResult.Status);
             var durationMilliseconds = TryParseDurationMilliseconds(singleResult.Duration);
-            var failureMessage = TrimToLimit(singleResult.Message, MaxFailureTextLength);
-            var failureStackTrace = TrimToLimit(singleResult.Trace, MaxFailureTextLength);
+            TestFailure? failure = null;
+            string? failureMessage = null;
+            string? failureStackTrace = null;
 
             if (outcome != TestOutcome.Failed)
             {
                 failureMessage = null;
                 failureStackTrace = null;
+                failure = null;
+            }
+            else
+            {
+                failure = FailureFormatting.BuildFailure(singleResult, outputOptions);
+                if (outputOptions.OutputMode == OutputMode.Verbose)
+                    failureMessage = failure.Message?.Text;
+                else
+                    failureMessage = failure.TopLine;
+
+                failureStackTrace = failure.StackTrace?.Text;
             }
 
             var message = outcome switch
@@ -146,7 +175,8 @@ public sealed class RunSingleTestTool(
                 message,
                 durationMilliseconds,
                 failureMessage,
-                failureStackTrace);
+                failureStackTrace,
+                failure);
         }
     }
 
@@ -163,7 +193,10 @@ public sealed class RunSingleTestTool(
         [property:
             Description(
                 "Failure stack trace when Outcome is Failed; otherwise null. May be truncated.")]
-        string? FailureStackTrace);
+        string? FailureStackTrace,
+        [property:
+            Description("Structured failure details when Outcome is Failed; otherwise null.")]
+        TestFailure? Failure);
 
     private static TestOutcome MapOutcome(string? status)
         => status?.ToLowerInvariant() switch
@@ -183,6 +216,28 @@ public sealed class RunSingleTestTool(
         return duration > int.MaxValue ? int.MaxValue : (int)duration;
     }
 
+    private static string BuildCommandSummary(CommandResult commandResult)
+    {
+        if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
+        {
+            var output =
+                TrimToLimit(commandResult.StandardError, FailureFormatting.DefaultMaxFailureChars)
+                ?? string.Empty;
+            return $" ExitCode={commandResult.ExitCode}. Stderr: {output}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(commandResult.StandardOutput))
+        {
+            var output = TrimToLimit(
+                    commandResult.StandardOutput,
+                    FailureFormatting.DefaultMaxFailureChars)
+                ?? string.Empty;
+            return $" ExitCode={commandResult.ExitCode}. Stdout: {output}";
+        }
+
+        return commandResult.ExitCode == 0 ? string.Empty : $" ExitCode={commandResult.ExitCode}.";
+    }
+
     private static string? TrimToLimit(string? value, int maxLength)
     {
         if (string.IsNullOrEmpty(value))
@@ -192,25 +247,6 @@ public sealed class RunSingleTestTool(
             return value;
 
         return value.Substring(0, maxLength);
-    }
-
-    private static string BuildCommandSummary(CommandResult commandResult)
-    {
-        if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
-        {
-            var output =
-                TrimToLimit(commandResult.StandardError, MaxFailureTextLength) ?? string.Empty;
-            return $" ExitCode={commandResult.ExitCode}. Stderr: {output}";
-        }
-
-        if (!string.IsNullOrWhiteSpace(commandResult.StandardOutput))
-        {
-            var output = TrimToLimit(commandResult.StandardOutput, MaxFailureTextLength)
-                ?? string.Empty;
-            return $" ExitCode={commandResult.ExitCode}. Stdout: {output}";
-        }
-
-        return commandResult.ExitCode == 0 ? string.Empty : $" ExitCode={commandResult.ExitCode}.";
     }
 
     private static void TryDelete(string path)

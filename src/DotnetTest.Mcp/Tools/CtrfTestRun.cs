@@ -6,7 +6,6 @@ namespace DotnetTest.Mcp.Tools;
 
 internal static class CtrfTestRun
 {
-    internal const int MaxFailureTextLength = 4000;
 
     internal sealed record Result(
         CommandResult CommandResult,
@@ -78,14 +77,18 @@ internal static class CtrfTestRun
     {
         if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
         {
-            var output = TrimToLimit(commandResult.StandardError, MaxFailureTextLength)
+            var output = TrimToLimit(
+                    commandResult.StandardError,
+                    FailureFormatting.DefaultMaxFailureChars)
                 ?? string.Empty;
             return $" ExitCode={commandResult.ExitCode}. Stderr: {output}";
         }
 
         if (!string.IsNullOrWhiteSpace(commandResult.StandardOutput))
         {
-            var output = TrimToLimit(commandResult.StandardOutput, MaxFailureTextLength)
+            var output = TrimToLimit(
+                    commandResult.StandardOutput,
+                    FailureFormatting.DefaultMaxFailureChars)
                 ?? string.Empty;
             return $" ExitCode={commandResult.ExitCode}. Stdout: {output}";
         }

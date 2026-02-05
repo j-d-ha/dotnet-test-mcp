@@ -20,12 +20,30 @@ public sealed class RunAllTestsForProjectTool(
     [Description("Runs all tests for a single project.")]
     public async Task<Result> RunAllTestsForProject(
         [Description("Path to the project file (.csproj) to test.")] string projectPath,
+        [Description("Output mode: summary or verbose.")] OutputMode outputMode =
+            OutputMode.Summary,
+        [Description(
+            "Include stack traces in failure details. Defaults to false in summary, true in verbose.")]
+        bool? includeStackTrace = null,
+        [Description("Maximum characters to include for failure message/trace.")]
+        int? maxFailureChars = null,
+        [Description("Maximum lines to include for failure message/trace.")] int? maxFailureLines =
+            null,
+        [Description("Maximum number of per-test failure details to return.")] int? maxFailures =
+            null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(projectPath))
             throw new ArgumentException("Project path is required.", nameof(projectPath));
 
         var trimmedProjectPath = projectPath.Trim();
+
+        var outputOptions = FailureFormatting.CreateOptions(
+            outputMode,
+            includeStackTrace,
+            maxFailureChars,
+            maxFailureLines);
+        var resolvedMaxFailures = FailureFormatting.ResolveMaxFailures(maxFailures);
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
@@ -41,14 +59,18 @@ public sealed class RunAllTestsForProjectTool(
                     trimmedProjectPath,
                     TestOutcome.Error,
                     AppendSummary(runResult.ReadErrorMessage, commandSummary),
-                    runResult.CommandResult.ExitCode);
+                    runResult.CommandResult.ExitCode,
+                    [],
+                    false);
 
             if (!runResult.ReportFileFound && runResult.CommandResult.ExitCode == 8)
                 return CreateResult(
                     trimmedProjectPath,
                     TestOutcome.NotFound,
                     "No tests found.",
-                    runResult.CommandResult.ExitCode);
+                    runResult.CommandResult.ExitCode,
+                    [],
+                    false);
 
             return CreateResult(
                 trimmedProjectPath,
@@ -56,13 +78,17 @@ public sealed class RunAllTestsForProjectTool(
                 string.IsNullOrEmpty(commandSummary)
                     ? "Test result file not found."
                     : $"Test result file not found.{commandSummary}",
-                runResult.CommandResult.ExitCode);
+                runResult.CommandResult.ExitCode,
+                [],
+                false);
         }
 
         return CreateResultFromReport(
             trimmedProjectPath,
             runResult.Report,
-            runResult.CommandResult);
+            runResult.CommandResult,
+            outputOptions,
+            resolvedMaxFailures);
     }
 
     [Description("Result of running all tests for a project.")]
@@ -81,19 +107,42 @@ public sealed class RunAllTestsForProjectTool(
         [property: Description("Total duration in milliseconds when available; otherwise null.")]
         int? DurationMilliseconds,
         [property: Description("Up to the first 20 failing test names when available.")]
-        string[] FailingTests);
+        string[] FailingTests,
+        [property: Description("Structured details for up to maxFailures failed tests.")]
+        TestFailure[] FailureDetails,
+        [property: Description("True when more failed tests exist than returned.")]
+        bool HasMoreFailures);
 
     private Result CreateResult(
         string projectPath,
         TestOutcome outcome,
         string message,
-        int exitCode)
-        => new("project", projectPath, outcome, message, exitCode, 0, 0, 0, 0, 0, 0, null, []);
+        int exitCode,
+        TestFailure[] failureDetails,
+        bool hasMoreFailures)
+        => new(
+            "project",
+            projectPath,
+            outcome,
+            message,
+            exitCode,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            null,
+            [],
+            failureDetails,
+            hasMoreFailures);
 
     private Result CreateResultFromReport(
         string projectPath,
         CtrfReport report,
-        CommandResult commandResult)
+        CommandResult commandResult,
+        FailureFormatting.FailureOutputOptions outputOptions,
+        int maxFailures)
     {
         var summary = report.Results.Summary;
         var tests = report.Results.Tests;
@@ -108,6 +157,8 @@ public sealed class RunAllTestsForProjectTool(
 
         var durationMilliseconds = CtrfTestRun.TryParseDurationMilliseconds(summary.Duration);
         var failingTests = ExtractFailingTests(tests);
+        var failureDetails =
+            ExtractFailureDetails(tests, outputOptions, maxFailures, out var hasMoreFailures);
 
         if (exitCode != 0 && exitCode != 8 && failed == 0)
         {
@@ -127,7 +178,9 @@ public sealed class RunAllTestsForProjectTool(
                 pending,
                 other,
                 durationMilliseconds,
-                failingTests);
+                failingTests,
+                failureDetails,
+                hasMoreFailures);
         }
 
         if (testCount == 0 && tests.Count == 0)
@@ -144,7 +197,9 @@ public sealed class RunAllTestsForProjectTool(
                 pending,
                 other,
                 durationMilliseconds,
-                failingTests);
+                failingTests,
+                failureDetails,
+                hasMoreFailures);
 
         var outcome =
             failed > 0 ? TestOutcome.Failed : passed > 0 ? TestOutcome.Passed : TestOutcome.Skipped;
@@ -170,7 +225,9 @@ public sealed class RunAllTestsForProjectTool(
             pending,
             other,
             durationMilliseconds,
-            failingTests);
+            failingTests,
+            failureDetails,
+            hasMoreFailures);
     }
 
     private static int CountByStatus(IReadOnlyCollection<CtrfTest> tests, string status)
@@ -185,6 +242,31 @@ public sealed class RunAllTestsForProjectTool(
             .Distinct(StringComparer.Ordinal)
             .Take(MaxFailingTests)
             .ToArray();
+
+    private static TestFailure[] ExtractFailureDetails(
+        IReadOnlyCollection<CtrfTest> tests,
+        FailureFormatting.FailureOutputOptions outputOptions,
+        int maxFailures,
+        out bool hasMoreFailures)
+    {
+        var failures = tests.Where(test
+                => string.Equals(test.Status, "failed", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (failures.Count == 0 || maxFailures <= 0)
+        {
+            hasMoreFailures = failures.Count > 0;
+            return [];
+        }
+
+        var details = failures
+            .Take(maxFailures)
+            .Select(test => FailureFormatting.BuildFailure(test, outputOptions))
+            .ToArray();
+
+        hasMoreFailures = failures.Count > details.Length;
+        return details;
+    }
 
     private static string AppendSummary(string message, string commandSummary)
         => string.IsNullOrEmpty(commandSummary) ? message : $"{message}{commandSummary}";

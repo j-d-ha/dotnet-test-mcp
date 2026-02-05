@@ -31,6 +31,7 @@ builder.Services
     .WithTools<GetWorkingDirectoryTool>(jsonOptions)
     .WithTools<ListTestProjectsTool>(jsonOptions)
     .WithTools<ListTestsTool>(jsonOptions)
+    .WithTools<ListTestsSummaryTool>(jsonOptions)
     .WithTools<RunSingleTestTool>(jsonOptions)
     .WithTools<RunAllTestsTool>(jsonOptions)
     .WithTools<RunAllTestsForProjectTool>(jsonOptions)
@@ -47,6 +48,9 @@ await builder.Build().RunAsync();
     TypeInfoPropertyName = "ListTestProjectsToolResult")]
 [JsonSerializable(typeof(ListTestsTool.Result), TypeInfoPropertyName = "ListTestsToolResult")]
 [JsonSerializable(
+    typeof(ListTestsSummaryTool.Result),
+    TypeInfoPropertyName = "ListTestsSummaryToolResult")]
+[JsonSerializable(
     typeof(RunSingleTestTool.Result),
     TypeInfoPropertyName = "RunSingleTestToolResult")]
 [JsonSerializable(typeof(RunAllTestsTool.Result), TypeInfoPropertyName = "RunAllTestsToolResult")]
@@ -56,5 +60,8 @@ await builder.Build().RunAsync();
 [JsonSerializable(
     typeof(RunAllTestsInClassTool.Result),
     TypeInfoPropertyName = "RunAllTestsInClassToolResult")]
+[JsonSerializable(typeof(OutputMode), TypeInfoPropertyName = "OutputMode")]
+[JsonSerializable(typeof(TestFailure), TypeInfoPropertyName = "TestFailure")]
+[JsonSerializable(typeof(TruncatedText), TypeInfoPropertyName = "TruncatedText")]
 [JsonSerializable(typeof(CtrfReport), TypeInfoPropertyName = "CtrfReport")]
 public partial class JsonContext : JsonSerializerContext;
