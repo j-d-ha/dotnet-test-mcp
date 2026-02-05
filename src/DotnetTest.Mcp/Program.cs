@@ -1,7 +1,5 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using DotnetTest.Mcp;
-using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
 using DotnetTest.Mcp.Tools;
 using Microsoft.Extensions.Configuration;
@@ -38,30 +36,3 @@ builder.Services
     .WithTools<RunAllTestsInClassTool>(jsonOptions);
 
 await builder.Build().RunAsync();
-
-[JsonSourceGenerationOptions(UseStringEnumConverter = true)]
-[JsonSerializable(
-    typeof(GetWorkingDirectoryTool.Result),
-    TypeInfoPropertyName = "GetWorkingDirectoryToolResult")]
-[JsonSerializable(
-    typeof(ListTestProjectsTool.Result),
-    TypeInfoPropertyName = "ListTestProjectsToolResult")]
-[JsonSerializable(typeof(ListTestsTool.Result), TypeInfoPropertyName = "ListTestsToolResult")]
-[JsonSerializable(
-    typeof(ListTestsSummaryTool.Result),
-    TypeInfoPropertyName = "ListTestsSummaryToolResult")]
-[JsonSerializable(
-    typeof(RunSingleTestTool.Result),
-    TypeInfoPropertyName = "RunSingleTestToolResult")]
-[JsonSerializable(typeof(RunAllTestsTool.Result), TypeInfoPropertyName = "RunAllTestsToolResult")]
-[JsonSerializable(
-    typeof(RunAllTestsForProjectTool.Result),
-    TypeInfoPropertyName = "RunAllTestsForProjectToolResult")]
-[JsonSerializable(
-    typeof(RunAllTestsInClassTool.Result),
-    TypeInfoPropertyName = "RunAllTestsInClassToolResult")]
-[JsonSerializable(typeof(OutputMode), TypeInfoPropertyName = "OutputMode")]
-[JsonSerializable(typeof(TestFailure), TypeInfoPropertyName = "TestFailure")]
-[JsonSerializable(typeof(TruncatedText), TypeInfoPropertyName = "TruncatedText")]
-[JsonSerializable(typeof(CtrfReport), TypeInfoPropertyName = "CtrfReport")]
-public partial class JsonContext : JsonSerializerContext;

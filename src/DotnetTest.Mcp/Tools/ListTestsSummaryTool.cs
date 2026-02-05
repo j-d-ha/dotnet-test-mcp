@@ -8,6 +8,7 @@ namespace DotnetTest.Mcp.Tools;
 public sealed class ListTestsSummaryTool(ICommandRunner commandRunner)
 {
     private const int DefaultTake = 50;
+    private const int MaxTake = 200;
 
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
 
@@ -27,6 +28,9 @@ public sealed class ListTestsSummaryTool(ICommandRunner commandRunner)
             throw new ArgumentOutOfRangeException(nameof(skip));
 
         if (take <= 0)
+            throw new ArgumentOutOfRangeException(nameof(take));
+
+        if (take > MaxTake)
             throw new ArgumentOutOfRangeException(nameof(take));
 
         var trimmedProjectPath = string.IsNullOrWhiteSpace(projectPath) ? null : projectPath.Trim();

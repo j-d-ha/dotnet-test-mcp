@@ -28,6 +28,8 @@ public sealed class RunSingleTestTool(
         string qualifiedTestName,
         [Description("Output mode: summary or verbose.")] OutputMode outputMode =
             OutputMode.Summary,
+        [Description("Failure detail level: None, TopLine, DiffSnippet, or Full.")]
+        FailureDetailLevel failureDetailLevel = FailureDetailLevel.TopLine,
         [Description(
             "Include stack traces in failure details. Defaults to false in summary, true in verbose.")]
         bool? includeStackTrace = null,
@@ -64,12 +66,9 @@ public sealed class RunSingleTestTool(
                 if (commandResult.ExitCode == 8)
                     return CreateResult(TestOutcome.NotFound, "No tests matched the filter.");
 
-                var commandSummary = BuildCommandSummary(commandResult);
-                return CreateResult(
-                    TestOutcome.Error,
-                    string.IsNullOrEmpty(commandSummary)
-                        ? "Test result file not found."
-                        : $"Test result file not found.{commandSummary}");
+                var errorKind = CtrfTestRun.ClassifyErrorKind(commandResult, false, null);
+                var error = CtrfTestRun.BuildErrorInfo(commandResult, null, outputMode, errorKind);
+                return CreateResult(TestOutcome.Error, error.Summary, error: error);
             }
 
             var json = await File.ReadAllTextAsync(fullCtrfPath, cancellationToken);
@@ -77,7 +76,14 @@ public sealed class RunSingleTestTool(
             var report = JsonSerializer.Deserialize<CtrfReport>(json, _jsonOptions);
 #pragma warning restore IL2026, IL3050
             if (report is null)
-                return CreateResult(TestOutcome.Error, "Failed to read test results.");
+            {
+                var error = CtrfTestRun.BuildErrorInfo(
+                    commandResult,
+                    "Failed to read test results.",
+                    outputMode,
+                    ErrorKind.ReadFailed);
+                return CreateResult(TestOutcome.Error, error.Summary, error: error);
+            }
 
             var results = report.Results.Tests;
             if (results.Count == 0)
@@ -87,7 +93,8 @@ public sealed class RunSingleTestTool(
                 outputMode,
                 includeStackTrace,
                 maxFailureChars,
-                maxFailureLines);
+                maxFailureLines,
+                failureDetailLevel);
 
             if (results.Count == 1)
                 return CreateResultFromTest(results[0], outputOptions);
@@ -112,7 +119,12 @@ public sealed class RunSingleTestTool(
         }
         catch
         {
-            return CreateResult(TestOutcome.Error, "Failed to read test results.");
+            var error = CtrfTestRun.BuildErrorInfo(
+                commandResult,
+                "Failed to read test results.",
+                outputMode,
+                ErrorKind.ReadFailed);
+            return CreateResult(TestOutcome.Error, error.Summary, error: error);
         }
         finally
         {
@@ -125,7 +137,8 @@ public sealed class RunSingleTestTool(
             int? durationMilliseconds = null,
             string? failureMessage = null,
             string? failureStackTrace = null,
-            TestFailure? failure = null)
+            TestFailure? failure = null,
+            ErrorInfo? error = null)
             => new(
                 qualifiedTestName,
                 outcome,
@@ -133,7 +146,8 @@ public sealed class RunSingleTestTool(
                 durationMilliseconds,
                 failureMessage,
                 failureStackTrace,
-                failure);
+                failure,
+                error);
 
         Result CreateResultFromTest(
             CtrfTest singleResult,
@@ -154,12 +168,13 @@ public sealed class RunSingleTestTool(
             else
             {
                 failure = FailureFormatting.BuildFailure(singleResult, outputOptions);
-                if (outputOptions.OutputMode == OutputMode.Verbose)
-                    failureMessage = failure.Message?.Text;
-                else
-                    failureMessage = failure.TopLine;
-
-                failureStackTrace = failure.StackTrace?.Text;
+                if (failure is not null)
+                {
+                    failureMessage = outputOptions.DetailLevel == FailureDetailLevel.Full
+                        ? failure.Message?.Text
+                        : failure.TopLine;
+                    failureStackTrace = failure.StackTrace?.Text;
+                }
             }
 
             var message = outcome switch
@@ -196,7 +211,9 @@ public sealed class RunSingleTestTool(
         string? FailureStackTrace,
         [property:
             Description("Structured failure details when Outcome is Failed; otherwise null.")]
-        TestFailure? Failure);
+        TestFailure? Failure,
+        [property: Description("Structured error details when Outcome is Error; otherwise null.")]
+        ErrorInfo? Error);
 
     private static TestOutcome MapOutcome(string? status)
         => status?.ToLowerInvariant() switch
@@ -214,39 +231,6 @@ public sealed class RunSingleTestTool(
             return null;
 
         return duration > int.MaxValue ? int.MaxValue : (int)duration;
-    }
-
-    private static string BuildCommandSummary(CommandResult commandResult)
-    {
-        if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
-        {
-            var output =
-                TrimToLimit(commandResult.StandardError, FailureFormatting.DefaultMaxFailureChars)
-                ?? string.Empty;
-            return $" ExitCode={commandResult.ExitCode}. Stderr: {output}";
-        }
-
-        if (!string.IsNullOrWhiteSpace(commandResult.StandardOutput))
-        {
-            var output = TrimToLimit(
-                    commandResult.StandardOutput,
-                    FailureFormatting.DefaultMaxFailureChars)
-                ?? string.Empty;
-            return $" ExitCode={commandResult.ExitCode}. Stdout: {output}";
-        }
-
-        return commandResult.ExitCode == 0 ? string.Empty : $" ExitCode={commandResult.ExitCode}.";
-    }
-
-    private static string? TrimToLimit(string? value, int maxLength)
-    {
-        if (string.IsNullOrEmpty(value))
-            return value;
-
-        if (value.Length <= maxLength)
-            return value;
-
-        return value.Substring(0, maxLength);
     }
 
     private static void TryDelete(string path)

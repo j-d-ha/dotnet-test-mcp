@@ -6,7 +6,6 @@ namespace DotnetTest.Mcp.Tools;
 
 internal static class CtrfTestRun
 {
-
     internal sealed record Result(
         CommandResult CommandResult,
         CtrfReport? Report,
@@ -73,6 +72,65 @@ internal static class CtrfTestRun
         return new Result(commandResult, report, reportFileFound, readErrorMessage);
     }
 
+    internal static ErrorKind ClassifyErrorKind(
+        CommandResult commandResult,
+        bool reportFileFound,
+        string? readErrorMessage)
+    {
+        if (!string.IsNullOrWhiteSpace(readErrorMessage))
+            return ErrorKind.ReadFailed;
+
+        var output = BuildOutputCombined(commandResult);
+        if (ContainsErrorToken(output, "testhost")
+            || ContainsErrorToken(output, "TypeLoadException")
+            || ContainsErrorToken(output, "Unhandled exception"))
+            return ErrorKind.TestHostCrashed;
+
+        if (ContainsErrorToken(output, "Build FAILED")
+            || ContainsErrorToken(output, "error CS")
+            || ContainsErrorToken(output, "error MSB"))
+            return ErrorKind.BuildFailed;
+
+        if (ContainsErrorToken(output, "Test discovery")
+            || ContainsErrorToken(output, "Discovering tests")
+            || ContainsErrorToken(output, "Failed to discover tests"))
+            return ErrorKind.DiscoveryFailed;
+
+        if (!reportFileFound)
+            return ErrorKind.ResultFileMissing;
+
+        return ErrorKind.Unknown;
+    }
+
+    internal static ErrorInfo BuildErrorInfo(
+        CommandResult commandResult,
+        string? readErrorMessage,
+        OutputMode outputMode,
+        ErrorKind errorKind)
+    {
+        var maxChars = outputMode == OutputMode.Verbose
+            ? FailureFormatting.DefaultErrorMaxCharsVerbose
+            : FailureFormatting.DefaultErrorMaxCharsSummary;
+        var maxLines = outputMode == OutputMode.Verbose
+            ? FailureFormatting.DefaultErrorMaxLinesVerbose
+            : FailureFormatting.DefaultErrorMaxLinesSummary;
+
+        var stderr = TextTruncation.Truncate(commandResult.StandardError, maxChars, maxLines);
+        var stdout = TextTruncation.Truncate(commandResult.StandardOutput, maxChars, maxLines);
+
+        var summary = readErrorMessage;
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            var (topLine, _) = FailureFormatting.GetTopLine(
+                commandResult.StandardError,
+                commandResult.StandardOutput,
+                FailureFormatting.DefaultErrorSummaryChars);
+            summary = string.IsNullOrWhiteSpace(topLine) ? "Test execution failed." : topLine;
+        }
+
+        return new ErrorInfo(errorKind, summary, stdout, stderr);
+    }
+
     internal static string BuildCommandSummary(CommandResult commandResult)
     {
         if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
@@ -114,6 +172,23 @@ internal static class CtrfTestRun
 
         return value.Substring(0, maxLength);
     }
+
+    private static string BuildOutputCombined(CommandResult commandResult)
+    {
+        if (string.IsNullOrWhiteSpace(commandResult.StandardError))
+            return commandResult.StandardOutput ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(commandResult.StandardOutput))
+            return commandResult.StandardError ?? string.Empty;
+
+        return string.Concat(
+            commandResult.StandardError,
+            Environment.NewLine,
+            commandResult.StandardOutput);
+    }
+
+    private static bool ContainsErrorToken(string source, string token)
+        => source.Contains(token, StringComparison.OrdinalIgnoreCase);
 
     private static void TryDelete(string path)
     {

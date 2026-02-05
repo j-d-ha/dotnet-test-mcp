@@ -8,10 +8,16 @@ internal static class FailureFormatting
     internal const int DefaultMaxFailureLines = 40;
     internal const int DefaultTopLineChars = 200;
     internal const int DefaultMaxFailures = 1;
+    internal const int DefaultErrorMaxCharsSummary = 400;
+    internal const int DefaultErrorMaxCharsVerbose = 2000;
+    internal const int DefaultErrorMaxLinesSummary = 12;
+    internal const int DefaultErrorMaxLinesVerbose = 40;
+    internal const int DefaultErrorSummaryChars = 200;
 
     internal sealed record FailureOutputOptions(
         OutputMode OutputMode,
         bool IncludeStackTrace,
+        FailureDetailLevel DetailLevel,
         int MaxFailureChars,
         int MaxFailureLines,
         int TopLineMaxChars);
@@ -20,7 +26,8 @@ internal static class FailureFormatting
         OutputMode outputMode,
         bool? includeStackTrace,
         int? maxFailureChars,
-        int? maxFailureLines)
+        int? maxFailureLines,
+        FailureDetailLevel failureDetailLevel)
     {
         if (maxFailureChars is <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxFailureChars));
@@ -30,12 +37,14 @@ internal static class FailureFormatting
 
         var resolvedMaxChars = maxFailureChars ?? DefaultMaxFailureChars;
         var resolvedMaxLines = maxFailureLines ?? DefaultMaxFailureLines;
-        var resolvedIncludeStackTrace = includeStackTrace ?? outputMode == OutputMode.Verbose;
+        var resolvedIncludeStackTrace =
+            includeStackTrace ?? failureDetailLevel == FailureDetailLevel.Full;
         var topLineMaxChars = Math.Min(DefaultTopLineChars, resolvedMaxChars);
 
         return new FailureOutputOptions(
             outputMode,
             resolvedIncludeStackTrace,
+            failureDetailLevel,
             resolvedMaxChars,
             resolvedMaxLines,
             topLineMaxChars);
@@ -49,8 +58,11 @@ internal static class FailureFormatting
         return maxFailures ?? DefaultMaxFailures;
     }
 
-    internal static TestFailure BuildFailure(CtrfTest test, FailureOutputOptions options)
+    internal static TestFailure? BuildFailure(CtrfTest test, FailureOutputOptions options)
     {
+        if (options.DetailLevel == FailureDetailLevel.None)
+            return null;
+
         var testName = string.IsNullOrWhiteSpace(test.Name) ? test.Id ?? string.Empty : test.Name;
 
         var (topLine, topLineTruncated) = GetTopLine(
@@ -59,25 +71,28 @@ internal static class FailureFormatting
             options.TopLineMaxChars);
 
         TruncatedText? message = null;
-        if (options.OutputMode == OutputMode.Verbose)
+        if (options.DetailLevel == FailureDetailLevel.Full)
             message = TextTruncation.Truncate(
                 test.Message,
                 options.MaxFailureChars,
                 options.MaxFailureLines);
 
         TruncatedText? stackTrace = null;
-        if (options.IncludeStackTrace)
+        if (options.DetailLevel == FailureDetailLevel.Full && options.IncludeStackTrace)
             stackTrace = TextTruncation.Truncate(
                 test.Trace,
                 options.MaxFailureChars,
                 options.MaxFailureLines);
 
-        var (diffSummary, diffContext) = ExtractDiff(
-            test.Message,
-            test.Snippet,
-            options.TopLineMaxChars,
-            options.MaxFailureChars,
-            options.MaxFailureLines);
+        string? diffSummary = null;
+        string? diffContext = null;
+        if (options.DetailLevel is FailureDetailLevel.DiffSnippet or FailureDetailLevel.Full)
+            (diffSummary, diffContext) = ExtractDiff(
+                test.Message,
+                test.Snippet,
+                options.TopLineMaxChars,
+                options.MaxFailureChars,
+                options.MaxFailureLines);
 
         return new TestFailure(
             testName,
