@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
 namespace DotnetTest.Mcp;
@@ -9,12 +10,14 @@ namespace DotnetTest.Mcp;
 [McpServerToolType]
 public sealed class RunSingleTestTool(
     ICommandRunner commandRunner,
-    JsonSerializerOptions jsonOptions)
+    JsonSerializerOptions jsonOptions,
+    ILogger<RunSingleTestTool> logger)
 {
     private const int MaxFailureTextLength = 4000;
 
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions.ValidateNotNull();
+    private readonly ILogger<RunSingleTestTool> _logger = logger.ValidateNotNull();
 
     [McpServerTool(UseStructuredContent = true)]
     [Description("Runs a single dotnet test.")]
@@ -38,7 +41,7 @@ public sealed class RunSingleTestTool(
                 "test",
                 "--report-ctrf",
                 "--filter-method",
-                qualifiedTestName,
+                qualifiedTestName.Trim(),
                 "--report-ctrf-filename",
                 ctrfFileName,
                 "--results-directory",

@@ -30,9 +30,7 @@ builder.Services
 
 await builder.Build().RunAsync();
 
-[JsonSourceGenerationOptions(
-    GenerationMode = JsonSourceGenerationMode.Default,
-    UseStringEnumConverter = true)]
+[JsonSourceGenerationOptions(UseStringEnumConverter = true)]
 [JsonSerializable(
     typeof(GetWorkingDirectoryTool.Result),
     TypeInfoPropertyName = "GetWorkingDirectoryToolResult")]
