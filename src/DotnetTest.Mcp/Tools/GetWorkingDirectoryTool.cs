@@ -2,7 +2,7 @@ using System.ComponentModel;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
 
-namespace DotnetTest.Mcp;
+namespace DotnetTest.Mcp.Tools;
 
 [McpServerToolType]
 public sealed class GetWorkingDirectoryTool(IOptions<McpOptions> options)

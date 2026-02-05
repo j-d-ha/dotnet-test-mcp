@@ -5,7 +5,7 @@ using DotnetTest.Mcp.Terminal;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
-namespace DotnetTest.Mcp;
+namespace DotnetTest.Mcp.Tools;
 
 [McpServerToolType]
 public sealed class RunSingleTestTool(

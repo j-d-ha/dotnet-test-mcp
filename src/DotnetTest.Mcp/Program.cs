@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using DotnetTest.Mcp;
 using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
+using DotnetTest.Mcp.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
