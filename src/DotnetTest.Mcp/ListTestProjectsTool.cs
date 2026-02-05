@@ -8,17 +8,15 @@ namespace DotnetTest.Mcp;
 [McpServerToolType]
 public sealed class ListTestProjectsTool(IOptions<McpOptions> options, ICommandRunner commandRunner)
 {
-    private readonly McpOptions _options = options.Value;
+    private readonly McpOptions _options = options.ValidateNotNull().Value;
+    private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
 
     [McpServerTool(UseStructuredContent = true)]
     [Description("Lists test projects in the solution.")]
     public async Task<Result> ListTestProjects(CancellationToken cancellationToken)
     {
-        var result = await commandRunner.RunAsync(
-            new CommandRequest("dotnet", "sln", "list")
-            {
-                WorkingDirectory = _options.WorkingDirectory, ThrowOnNonZeroExitCode = true,
-            },
+        var result = await _commandRunner.RunAsync(
+            new CommandRequest("dotnet", "sln", "list"),
             cancellationToken);
 
         if (result.StandardOutputLines.FirstOrDefault() is not "Project(s)")

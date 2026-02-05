@@ -1,9 +1,18 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Options;
 
 namespace DotnetTest.Mcp.Terminal;
 
 public sealed class ProcessCommandRunner : ICommandRunner
 {
+    private readonly string? _defaultWorkingDirectory;
+
+    public ProcessCommandRunner(IOptions<McpOptions> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        _defaultWorkingDirectory = options.Value.WorkingDirectory;
+    }
+
     public async Task<CommandResult> RunAsync(
         CommandRequest request,
         CancellationToken cancellationToken = default)
@@ -20,8 +29,12 @@ public sealed class ProcessCommandRunner : ICommandRunner
             CreateNoWindow = true,
         };
 
-        if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
-            startInfo.WorkingDirectory = request.WorkingDirectory;
+        var workingDirectory = string.IsNullOrWhiteSpace(request.WorkingDirectory)
+            ? _defaultWorkingDirectory
+            : request.WorkingDirectory;
+
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+            startInfo.WorkingDirectory = workingDirectory;
 
         if (request.Arguments is not null)
             foreach (var argument in request.Arguments)

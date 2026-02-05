@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DotnetTest.Mcp;
+using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,14 +19,20 @@ builder.Services.AddScoped<ICommandRunner, ProcessCommandRunner>();
 
 var jsonOptions = new JsonSerializerOptions { TypeInfoResolver = JsonContext.Default };
 
+builder.Services.AddSingleton(jsonOptions);
+
 builder.Services
     .AddMcpServer(options => options.ScopeRequests = true)
     .WithStdioServerTransport()
     .WithTools<GetWorkingDirectoryTool>(jsonOptions)
-    .WithTools<ListTestProjectsTool>(jsonOptions);
+    .WithTools<ListTestProjectsTool>(jsonOptions)
+    .WithTools<RunSingleTestTool>(jsonOptions);
 
 await builder.Build().RunAsync();
 
+[JsonSourceGenerationOptions(
+    GenerationMode = JsonSourceGenerationMode.Default,
+    UseStringEnumConverter = true)]
 [JsonSerializable(
     typeof(GetWorkingDirectoryTool.Result),
     TypeInfoPropertyName = "GetWorkingDirectoryToolResult")]
@@ -35,4 +42,5 @@ await builder.Build().RunAsync();
 [JsonSerializable(
     typeof(RunSingleTestTool.Result),
     TypeInfoPropertyName = "RunSingleTestToolResult")]
+[JsonSerializable(typeof(CtrfReport), TypeInfoPropertyName = "CtrfReport")]
 public partial class JsonContext : JsonSerializerContext;

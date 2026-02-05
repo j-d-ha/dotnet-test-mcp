@@ -15,7 +15,7 @@ public sealed record CommandRequest(string FileName, params string[] Arguments)
 
     public TimeSpan? Timeout { get; init; }
 
-    public bool ThrowOnNonZeroExitCode { get; init; }
+    public bool ThrowOnNonZeroExitCode { get; init; } = true;
 
     public int? MaxOutputChars { get; init; }
 }
