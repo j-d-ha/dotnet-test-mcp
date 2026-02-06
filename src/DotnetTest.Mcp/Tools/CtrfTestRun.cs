@@ -6,6 +6,9 @@ namespace DotnetTest.Mcp.Tools;
 
 internal static class CtrfTestRun
 {
+    private const int DefaultErrorMaxChars = 8000;
+    private const int DefaultErrorMaxLines = 200;
+
     internal sealed record Result(
         CommandResult CommandResult,
         CtrfReport? Report,
@@ -118,51 +121,38 @@ internal static class CtrfTestRun
     internal static ErrorInfo BuildErrorInfo(
         CommandResult commandResult,
         string? readErrorMessage,
-        OutputMode outputMode,
         ErrorKind errorKind)
     {
-        var maxChars = outputMode == OutputMode.Verbose
-            ? FailureFormatting.DefaultErrorMaxCharsVerbose
-            : FailureFormatting.DefaultErrorMaxCharsSummary;
-        var maxLines = outputMode == OutputMode.Verbose
-            ? FailureFormatting.DefaultErrorMaxLinesVerbose
-            : FailureFormatting.DefaultErrorMaxLinesSummary;
+        var stderr = TextTruncation.Truncate(
+            commandResult.StandardError,
+            DefaultErrorMaxChars,
+            DefaultErrorMaxLines);
+        var stdout = TextTruncation.Truncate(
+            commandResult.StandardOutput,
+            DefaultErrorMaxChars,
+            DefaultErrorMaxLines);
 
-        var stderr = TextTruncation.Truncate(commandResult.StandardError, maxChars, maxLines);
-        var stdout = TextTruncation.Truncate(commandResult.StandardOutput, maxChars, maxLines);
-
-        var summary = readErrorMessage;
-        if (string.IsNullOrWhiteSpace(summary))
+        var reason = readErrorMessage;
+        if (string.IsNullOrWhiteSpace(reason))
         {
-            var (topLine, _) = FailureFormatting.GetTopLine(
-                commandResult.StandardError,
-                commandResult.StandardOutput,
-                FailureFormatting.DefaultErrorSummaryChars);
-            summary = string.IsNullOrWhiteSpace(topLine) ? "Test execution failed." : topLine;
+            if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
+                reason = commandResult.StandardError;
+            else if (!string.IsNullOrWhiteSpace(commandResult.StandardOutput))
+                reason = commandResult.StandardOutput;
+            else
+                reason = "Test execution failed.";
         }
 
-        return new ErrorInfo(errorKind, summary, stdout, stderr);
+        return new ErrorInfo(errorKind, reason, stdout, stderr);
     }
 
     internal static string BuildCommandSummary(CommandResult commandResult)
     {
         if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
-        {
-            var output = TrimToLimit(
-                    commandResult.StandardError,
-                    FailureFormatting.DefaultMaxFailureChars)
-                ?? string.Empty;
-            return $" ExitCode={commandResult.ExitCode}. Stderr: {output}";
-        }
+            return $" ExitCode={commandResult.ExitCode}. Stderr: {commandResult.StandardError}";
 
         if (!string.IsNullOrWhiteSpace(commandResult.StandardOutput))
-        {
-            var output = TrimToLimit(
-                    commandResult.StandardOutput,
-                    FailureFormatting.DefaultMaxFailureChars)
-                ?? string.Empty;
-            return $" ExitCode={commandResult.ExitCode}. Stdout: {output}";
-        }
+            return $" ExitCode={commandResult.ExitCode}. Stdout: {commandResult.StandardOutput}";
 
         return commandResult.ExitCode == 0 ? string.Empty : $" ExitCode={commandResult.ExitCode}.";
     }
@@ -175,16 +165,6 @@ internal static class CtrfTestRun
         return duration.Value > int.MaxValue ? int.MaxValue : (int)duration.Value;
     }
 
-    private static string? TrimToLimit(string? value, int maxLength)
-    {
-        if (string.IsNullOrEmpty(value))
-            return value;
-
-        if (value.Length <= maxLength)
-            return value;
-
-        return value.Substring(0, maxLength);
-    }
 
     private static string BuildOutputCombined(CommandResult commandResult)
     {

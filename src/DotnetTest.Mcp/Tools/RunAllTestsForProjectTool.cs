@@ -12,6 +12,7 @@ public sealed class RunAllTestsForProjectTool(
     JsonSerializerOptions jsonOptions)
 {
     private const int MaxFailingTests = 20;
+    private const int MaxFailureDetails = 3;
 
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions.ValidateNotNull();
@@ -20,60 +21,25 @@ public sealed class RunAllTestsForProjectTool(
     [Description("Runs all tests for a single project.")]
     public async Task<Result> RunAllTestsForProject(
         [Description("Path to the project file (.csproj) to test.")] string projectPath,
-        [Description("Output mode: summary or verbose.")] OutputMode outputMode =
-            OutputMode.Summary,
-        [Description("Failure detail level: None, TopLine, DiffSnippet, or Full.")]
-        FailureDetailLevel failureDetailLevel = FailureDetailLevel.TopLine,
-        [Description(
-            "Include stack traces in failure details. Defaults to false in summary, true in verbose.")]
-        bool? includeStackTrace = null,
-        [Description("Maximum characters to include for failure message/trace.")]
-        int? maxFailureChars = null,
-        [Description("Maximum lines to include for failure message/trace.")] int? maxFailureLines =
-            null,
-        [Description("Maximum number of per-test failure details to return.")] int? maxFailures =
-            null,
+        [Description("Include stack traces in failure details. Default is false.")]
+        bool includeStackTrace = false,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(projectPath))
             throw new ArgumentException("Project path is required.", nameof(projectPath));
 
         var trimmedProjectPath = projectPath.Trim();
-
-        var outputOptions = FailureFormatting.CreateOptions(
-            outputMode,
-            includeStackTrace,
-            maxFailureChars,
-            maxFailureLines,
-            failureDetailLevel);
-        var resolvedMaxFailures = FailureFormatting.ResolveMaxFailures(maxFailures);
+        var outputOptions = FailureFormatting.CreateOptions(includeStackTrace);
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
             _jsonOptions,
-            new[] { "test", "--project", trimmedProjectPath },
+            ["test", "--project", trimmedProjectPath],
             cancellationToken);
 
         if (runResult.Report is null)
         {
-            if (runResult.ReportFileFound && runResult.ReadErrorMessage is not null)
-            {
-                var errorInfo = CtrfTestRun.BuildErrorInfo(
-                    runResult.CommandResult,
-                    runResult.ReadErrorMessage,
-                    outputMode,
-                    ErrorKind.ReadFailed);
-                return CreateResult(
-                    trimmedProjectPath,
-                    TestOutcome.Error,
-                    errorInfo.Summary,
-                    runResult.CommandResult.ExitCode,
-                    [],
-                    false,
-                    errorInfo);
-            }
-
-            if (!runResult.ReportFileFound && runResult.CommandResult.ExitCode == 8)
+            if (runResult is { ReportFileFound: false, CommandResult.ExitCode: 8 })
                 return CreateResult(
                     trimmedProjectPath,
                     TestOutcome.NotFound,
@@ -90,12 +56,11 @@ public sealed class RunAllTestsForProjectTool(
             var error = CtrfTestRun.BuildErrorInfo(
                 runResult.CommandResult,
                 runResult.ReadErrorMessage,
-                outputMode,
                 errorKind);
             return CreateResult(
                 trimmedProjectPath,
                 TestOutcome.Error,
-                error.Summary,
+                error.Reason,
                 runResult.CommandResult.ExitCode,
                 [],
                 false,
@@ -106,8 +71,7 @@ public sealed class RunAllTestsForProjectTool(
             trimmedProjectPath,
             runResult.Report,
             runResult.CommandResult,
-            outputOptions,
-            resolvedMaxFailures);
+            outputOptions);
     }
 
     [Description("Result of running all tests for a project.")]
@@ -127,7 +91,7 @@ public sealed class RunAllTestsForProjectTool(
         int? DurationMilliseconds,
         [property: Description("Up to the first 20 failing test names when available.")]
         string[] FailingTests,
-        [property: Description("Structured details for up to maxFailures failed tests.")]
+        [property: Description("Structured details for up to 3 failed tests.")]
         TestFailure[] FailureDetails,
         [property: Description("True when more failed tests exist than returned.")]
         bool HasMoreFailures,
@@ -164,8 +128,7 @@ public sealed class RunAllTestsForProjectTool(
         string projectPath,
         CtrfReport report,
         CommandResult commandResult,
-        FailureFormatting.FailureOutputOptions outputOptions,
-        int maxFailures)
+        FailureFormatting.FailureOutputOptions outputOptions)
     {
         var summary = report.Results.Summary;
         var tests = report.Results.Tests;
@@ -180,22 +143,17 @@ public sealed class RunAllTestsForProjectTool(
 
         var durationMilliseconds = CtrfTestRun.TryParseDurationMilliseconds(summary.Duration);
         var failingTests = ExtractFailingTests(tests);
-        var failureDetails =
-            ExtractFailureDetails(tests, outputOptions, maxFailures, out var hasMoreFailures);
+        var failureDetails = ExtractFailureDetails(tests, outputOptions, out var hasMoreFailures);
 
         if (exitCode != 0 && exitCode != 8 && failed == 0)
         {
             var errorKind = CtrfTestRun.ClassifyErrorKind(commandResult, true, null);
-            var error = CtrfTestRun.BuildErrorInfo(
-                commandResult,
-                null,
-                outputOptions.OutputMode,
-                errorKind);
+            var error = CtrfTestRun.BuildErrorInfo(commandResult, null, errorKind);
             return new Result(
                 "project",
                 projectPath,
                 TestOutcome.Error,
-                error.Summary,
+                error.Reason,
                 exitCode,
                 testCount,
                 passed,
@@ -275,21 +233,19 @@ public sealed class RunAllTestsForProjectTool(
     private static TestFailure[] ExtractFailureDetails(
         IReadOnlyCollection<CtrfTest> tests,
         FailureFormatting.FailureOutputOptions outputOptions,
-        int maxFailures,
         out bool hasMoreFailures)
     {
         var failures = tests.Where(test
                 => string.Equals(test.Status, "failed", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (failures.Count == 0 || maxFailures <= 0)
+        if (failures.Count == 0)
         {
-            hasMoreFailures = failures.Count > 0;
+            hasMoreFailures = false;
             return [];
         }
 
-        var details = failures
-            .Take(maxFailures)
+        var details = failures.Take(MaxFailureDetails)
             .Select(test => FailureFormatting.BuildFailure(test, outputOptions))
             .Where(detail => detail is not null)
             .Select(detail => detail!)
@@ -298,7 +254,4 @@ public sealed class RunAllTestsForProjectTool(
         hasMoreFailures = failures.Count > details.Length;
         return details;
     }
-
-    private static string AppendSummary(string message, string commandSummary)
-        => string.IsNullOrEmpty(commandSummary) ? message : $"{message}{commandSummary}";
 }

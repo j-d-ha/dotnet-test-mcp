@@ -11,7 +11,6 @@ namespace DotnetTest.Mcp;
 [JsonSerializable(
     typeof(ListTestProjectsTool.Result),
     TypeInfoPropertyName = "ListTestProjectsToolResult")]
-[JsonSerializable(typeof(ListTestsTool.Result), TypeInfoPropertyName = "ListTestsToolResult")]
 [JsonSerializable(
     typeof(ListTestsSummaryTool.Result),
     TypeInfoPropertyName = "ListTestsSummaryToolResult")]
@@ -25,12 +24,9 @@ namespace DotnetTest.Mcp;
 [JsonSerializable(
     typeof(RunAllTestsInClassTool.Result),
     TypeInfoPropertyName = "RunAllTestsInClassToolResult")]
-[JsonSerializable(typeof(OutputMode), TypeInfoPropertyName = "OutputMode")]
-[JsonSerializable(typeof(FailureDetailLevel), TypeInfoPropertyName = "FailureDetailLevel")]
 [JsonSerializable(typeof(ErrorKind), TypeInfoPropertyName = "ErrorKind")]
 [JsonSerializable(typeof(ErrorInfo), TypeInfoPropertyName = "ErrorInfo")]
 [JsonSerializable(typeof(TestFailure), TypeInfoPropertyName = "TestFailure")]
-[JsonSerializable(typeof(ProjectAttempt), TypeInfoPropertyName = "ProjectAttempt")]
 [JsonSerializable(typeof(ProjectDiscoveryResult), TypeInfoPropertyName = "ProjectDiscoveryResult")]
 [JsonSerializable(typeof(TruncatedText), TypeInfoPropertyName = "TruncatedText")]
 [JsonSerializable(typeof(CtrfReport), TypeInfoPropertyName = "CtrfReport")]

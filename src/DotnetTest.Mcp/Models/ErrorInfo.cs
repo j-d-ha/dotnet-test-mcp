@@ -2,6 +2,6 @@ namespace DotnetTest.Mcp.Models;
 
 public sealed record ErrorInfo(
     ErrorKind Kind,
-    string Summary,
+    string Reason,
     TruncatedText? Stdout,
     TruncatedText? Stderr);

@@ -9,101 +9,24 @@ namespace DotnetTest.Mcp.Tools;
 [McpServerToolType]
 public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandRunner commandRunner)
 {
-    private const int DefaultTake = 50;
-    private const int MaxTake = 200;
+    private const int MaxReturnedTests = 200;
 
     private readonly McpOptions _options = options.ValidateNotNull().Value;
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
 
     [McpServerTool(UseStructuredContent = true)]
-    [Description("Summarizes discovered tests with counts and optional paging.")]
+    [Description("Summarizes discovered tests with counts and an optional capped list.")]
     public async Task<Result> ListTestsSummary(
-        [Description("Optional path to project file to scope listing.")] string? projectPath = null,
         [Description("Optional prefix to filter fully qualified test names.")] string? prefix =
             null,
-        [Description("Number of filtered tests to skip.")] int skip = 0,
-        [Description("Number of filtered tests to return.")] int take = DefaultTake,
-        [Description("When true, include the paged test names; otherwise return counts only.")]
+        [Description("When true, include up to 200 test names; otherwise return counts only.")]
         bool includeTests = false,
         [Description("When true, treat zero discovered tests as an error.")] bool requireTests =
             false,
         CancellationToken cancellationToken = default)
     {
-        if (skip < 0)
-            throw new ArgumentOutOfRangeException(nameof(skip));
-
-        if (take <= 0)
-            throw new ArgumentOutOfRangeException(nameof(take));
-
-        if (take > MaxTake)
-            throw new ArgumentOutOfRangeException(nameof(take));
-
-        var trimmedProjectPath = string.IsNullOrWhiteSpace(projectPath) ? null : projectPath.Trim();
         var trimmedPrefix = string.IsNullOrWhiteSpace(prefix) ? null : prefix.Trim();
 
-        return trimmedProjectPath is null
-            ? await ListSolutionTestsSummary(
-                trimmedPrefix,
-                skip,
-                take,
-                includeTests,
-                requireTests,
-                cancellationToken)
-            : await ListProjectTestsSummary(
-                trimmedProjectPath,
-                trimmedPrefix,
-                skip,
-                take,
-                includeTests,
-                requireTests,
-                cancellationToken);
-    }
-
-    private async Task<Result> ListProjectTestsSummary(
-        string projectPath,
-        string? prefix,
-        int skip,
-        int take,
-        bool includeTests,
-        bool requireTests,
-        CancellationToken cancellationToken)
-    {
-        var discovery = await DiscoverProjectTests(
-            projectPath,
-            prefix,
-            requireTests,
-            cancellationToken);
-
-        var tests = discovery.Tests;
-        var testCount = tests.Length;
-        var hasMore = skip + take < testCount;
-        var returnedTests = includeTests ? tests.Skip(skip).Take(take).ToArray() : [];
-        var returnedCount = includeTests ? returnedTests.Length : 0;
-        var projectResult = discovery.ProjectResult;
-
-        return new Result(
-            "project",
-            projectPath,
-            projectResult.Outcome,
-            projectResult.Message,
-            projectResult.ExitCode,
-            testCount,
-            returnedCount,
-            hasMore,
-            returnedTests,
-            projectResult.Warning,
-            [projectResult],
-            projectResult.Error);
-    }
-
-    private async Task<Result> ListSolutionTestsSummary(
-        string? prefix,
-        int skip,
-        int take,
-        bool includeTests,
-        bool requireTests,
-        CancellationToken cancellationToken)
-    {
         var testProjects = await TestProjectDiscovery.ListAsync(
             _commandRunner,
             _options,
@@ -120,9 +43,8 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
                     null);
                 return new Result(
                     "solution",
-                    null,
                     TestOutcome.Error,
-                    noTestsError.Summary,
+                    noTestsError.Reason,
                     0,
                     0,
                     0,
@@ -135,7 +57,6 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
 
             return new Result(
                 "solution",
-                null,
                 TestOutcome.Passed,
                 "No test projects discovered.",
                 0,
@@ -155,7 +76,7 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
         {
             var discovery = await DiscoverProjectTests(
                 projectPath,
-                prefix,
+                trimmedPrefix,
                 requireTests,
                 cancellationToken);
             projectResults.Add(discovery.ProjectResult);
@@ -167,9 +88,9 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
         var testCount = tests.Length;
-        var hasMore = skip + take < testCount;
-        var returnedTests = includeTests ? tests.Skip(skip).Take(take).ToArray() : [];
+        var returnedTests = includeTests ? tests.Take(MaxReturnedTests).ToArray() : [];
         var returnedCount = includeTests ? returnedTests.Length : 0;
+        var hasMore = includeTests && testCount > returnedCount;
 
         var anyError = projectResults.Any(result => result.Outcome == TestOutcome.Error);
         var anySuccess = projectResults.Any(result => result.Outcome == TestOutcome.Passed);
@@ -183,7 +104,7 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
         {
             error = new ErrorInfo(ErrorKind.NoTestsDiscovered, "No tests discovered.", null, null);
             outcome = TestOutcome.Error;
-            message = error.Summary;
+            message = error.Reason;
         }
         else if (anyError && anySuccess)
         {
@@ -210,7 +131,6 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
 
         return new Result(
             "solution",
-            null,
             outcome,
             message,
             0,
@@ -268,16 +188,12 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
                     tests);
             }
 
-            var error = CtrfTestRun.BuildErrorInfo(
-                commandResult,
-                null,
-                OutputMode.Summary,
-                errorKind);
+            var error = CtrfTestRun.BuildErrorInfo(commandResult, null, errorKind);
             return new ProjectDiscovery(
                 new ProjectDiscoveryResult(
                     projectPath,
                     TestOutcome.Error,
-                    error.Summary,
+                    error.Reason,
                     exitCode,
                     testCount,
                     null,
@@ -292,13 +208,12 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
                 var error = CtrfTestRun.BuildErrorInfo(
                     commandResult,
                     "No tests discovered.",
-                    OutputMode.Summary,
                     ErrorKind.NoTestsDiscovered);
                 return new ProjectDiscovery(
                     new ProjectDiscoveryResult(
                         projectPath,
                         TestOutcome.Error,
-                        error.Summary,
+                        error.Reason,
                         exitCode,
                         0,
                         null,
@@ -335,18 +250,18 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
 
     [Description("Result containing a summarized test listing.")]
     public record Result(
-        [property: Description("Scope used to list tests: solution or project.")] string Scope,
-        [property: Description("Project path used when Scope is project; otherwise null.")]
-        string? ProjectPath,
+        [property: Description("Scope used to list tests: solution.")] string Scope,
         [property: Description("Outcome of the discovery run.")] TestOutcome Outcome,
         [property: Description("Short summary (<= 1-2 lines).")] string Message,
         [property: Description("Process exit code from dotnet test when available.")] int ExitCode,
         [property: Description("Total discovered test count after filtering.")] int TestCount,
         [property: Description("Number of tests returned in this response.")] int ReturnedCount,
-        [property: Description("True when more tests exist beyond the current page.")] bool HasMore,
-        [property: Description("Optional page of fully qualified test names.")] string[] Tests,
+        [property: Description("True when more tests exist beyond the returned list.")]
+        bool HasMore,
+        [property: Description("Optional capped list of fully qualified test names.")]
+        string[] Tests,
         [property: Description("Optional warning message when Outcome is Passed.")] string? Warning,
-        [property: Description("Per-project discovery results when Scope is solution.")]
+        [property: Description("Per-project discovery results.")]
         ProjectDiscoveryResult[] ProjectResults,
         [property: Description("Structured error details when Outcome is Error; otherwise null.")]
         ErrorInfo? Error);

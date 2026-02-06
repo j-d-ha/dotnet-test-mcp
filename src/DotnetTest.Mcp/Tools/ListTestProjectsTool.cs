@@ -13,7 +13,7 @@ public sealed class ListTestProjectsTool(IOptions<McpOptions> options, ICommandR
 
     [McpServerTool(UseStructuredContent = true)]
     [Description("Lists test projects in the solution.")]
-    public async Task<Result> ListTestProjects(CancellationToken cancellationToken)
+    public async Task<Result> ListTestProjects(CancellationToken cancellationToken = default)
     {
         var testProjects = await TestProjectDiscovery.ListAsync(
             _commandRunner,

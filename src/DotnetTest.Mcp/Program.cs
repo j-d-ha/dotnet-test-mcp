@@ -28,7 +28,6 @@ builder.Services
     .WithStdioServerTransport()
     // .WithTools<GetWorkingDirectoryTool>(jsonOptions)
     .WithTools<ListTestProjectsTool>(jsonOptions)
-    .WithTools<ListTestsTool>(jsonOptions)
     .WithTools<ListTestsSummaryTool>(jsonOptions)
     .WithTools<RunSingleTestTool>(jsonOptions)
     .WithTools<RunAllTestsTool>(jsonOptions)
