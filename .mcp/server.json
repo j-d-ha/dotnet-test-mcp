@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "https://github.com/jonasha/dotnet-test-mcp",
+  "version": "0.1.0",
+  "description": "Run and filter .NET tests via MCP.",
+  "title": "Dotnet Test MCP",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "DotnetTest.Mcp",
+      "version": "0.0.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": [
+        {
+          "name": "WORKING_DIRECTORY",
+          "description": "Base directory used by tools that run dotnet commands.",
+          "placeholder": "/path/to/repo"
+        },
+        {
+          "name": "TESTS_DIRECTORY_NAME",
+          "description": "Relative folder name under WORKING_DIRECTORY that contains tests.",
+          "placeholder": "tests"
+        }
+      ]
+    }
+  ]
+}
