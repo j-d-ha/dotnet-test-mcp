@@ -18,6 +18,12 @@ tasks:
       - dotnet build -c Release
       - npx -y @modelcontextprotocol/inspector dotnet run --project src/DotnetTest.Mcp -c Release
 
+  nuget:publish:
+    desc: Pack and publish to NuGet
+    cmds:
+      - dotnet pack src/DotnetTest.Mcp -c Release -o ./nupkg
+      - dotnet nuget push ./nupkg/DotnetTest.Mcp.*.nupkg --source https://api.nuget.org/v3/index.json --api-key {{.NUGET_API_KEY}}
+
   inspect:release:
     desc: Run MCP Inspector against the release server
     env:
