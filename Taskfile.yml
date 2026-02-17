@@ -21,6 +21,7 @@ tasks:
   nuget:publish:
     desc: Pack and publish to NuGet
     cmds:
+      - rm -f ./nupkg/DotnetTest.Mcp.*.nupkg
       - dotnet pack src/DotnetTest.Mcp -c Release -o ./nupkg
       - dotnet nuget push ./nupkg/DotnetTest.Mcp.*.nupkg --source https://api.nuget.org/v3/index.json --api-key {{.NUGET_API_KEY}}
 

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Version>0.0.1-beta.2</Version>
+        <Version>0.0.1-beta.3</Version>
 
         <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
@@ -15,7 +15,7 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
         <PackAsTool>true</PackAsTool>
-        <ToolCommandName>test-mcp</ToolCommandName>
+        <ToolCommandName>dotnet-test-mcp</ToolCommandName>
         <PackageId>DotnetTest.Mcp</PackageId>
         <Authors>Jonas Ha</Authors>
         <Description>MCP Server for running MTP test</Description>
