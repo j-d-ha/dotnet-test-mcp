@@ -11,13 +11,27 @@
         <TrimmerSingleWarn>false</TrimmerSingleWarn>
         <SelfContained>true</SelfContained>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <IsPackable>false</IsPackable>
+
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>test-mcp</ToolCommandName>
+        <PackageId>DotnetTest.Mcp</PackageId>
+        <Version>0.0.1-beta.1</Version>
+        <Authors>Jonas Ha</Authors>
+        <Description>MCP Server for running MTP test</Description>
+        <PackageTags>tool, mcp, test, mtp</PackageTags>
+        <RepositoryUrl>https://github.com/j-d-ha/dotnet-test-mcp</RepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Copyright>Copyright © 2026 Jonas Ha</Copyright>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2"/>
         <PackageReference Include="ModelContextProtocol" Version="0.7.0-preview.1"/>
-        <PackageReference Include="StackXML" Version="1.0.1"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="/"/>
     </ItemGroup>
 
 </Project>
