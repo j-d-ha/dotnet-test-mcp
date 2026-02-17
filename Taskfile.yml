@@ -17,3 +17,10 @@ tasks:
     cmds:
       - dotnet build -c Release
       - npx -y @modelcontextprotocol/inspector dotnet run --project src/DotnetTest.Mcp -c Release
+
+  inspect:release:
+    desc: Run MCP Inspector against the release server
+    env:
+      WORKING_DIRECTORY: "{{.HOME}}/Repos/CSharp/dynamodb-efcore-provider"
+    cmds:
+      - npx -y @modelcontextprotocol/inspector dotnet test-mcp
