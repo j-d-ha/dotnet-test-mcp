@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Version>0.0.1-beta.4</Version>
+
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PublishAot>true</PublishAot>
+        <InvariantGlobalization>true</InvariantGlobalization>
+        <TrimmerSingleWarn>false</TrimmerSingleWarn>
+        <SelfContained>true</SelfContained>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>dotnet-test-mcp</ToolCommandName>
+        <PackageId>DotnetTest.Mcp</PackageId>
+        <Authors>Jonas Ha</Authors>
+        <Description>MCP Server for running MTP test</Description>
+        <PackageTags>tool, mcp, test, mtp</PackageTags>
+        <RepositoryUrl>https://github.com/j-d-ha/dotnet-test-mcp</RepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Copyright>Copyright © 2026 Jonas Ha</Copyright>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2"/>
+        <PackageReference Include="ModelContextProtocol" Version="0.7.0-preview.1"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="/"/>
+    </ItemGroup>
+
+</Project>

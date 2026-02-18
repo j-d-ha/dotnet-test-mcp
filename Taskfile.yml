@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+
+tasks:
+  default:
+    desc: list all tasks
+    cmds:
+      - task --list
+    silent: true
+
+  inspect:
+    desc: Run MCP Inspector against the local server
+    env:
+      WORKING_DIRECTORY: "{{.HOME}}/Repos/CSharp/dynamodb-efcore-provider"
+    cmds:
+      - dotnet build -c Release
+      - npx -y @modelcontextprotocol/inspector dotnet run --project src/DotnetTest.Mcp -c Release
+
+  nuget:publish:
+    desc: Pack and publish to NuGet
+    cmds:
+      - rm -f ./nupkg/DotnetTest.Mcp.*.nupkg
+      - dotnet pack src/DotnetTest.Mcp -c Release -o ./nupkg
+      - dotnet nuget push ./nupkg/DotnetTest.Mcp.*.nupkg --source https://api.nuget.org/v3/index.json --api-key {{.NUGET_API_KEY}}
+
+  inspect:release:
+    desc: Run MCP Inspector against the release server
+    env:
+      WORKING_DIRECTORY: "{{.HOME}}/Repos/CSharp/dynamodb-efcore-provider"
+    cmds:
+      - npx -y @modelcontextprotocol/inspector dotnet-test-mcp
