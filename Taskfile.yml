@@ -30,4 +30,4 @@ tasks:
     env:
       WORKING_DIRECTORY: "{{.HOME}}/Repos/CSharp/dynamodb-efcore-provider"
     cmds:
-      - npx -y @modelcontextprotocol/inspector dotnet test-mcp
+      - npx -y @modelcontextprotocol/inspector dotnet-test-mcp
