@@ -1,4 +1,5 @@
 # dotnet-test-mcp
+An MCP server for running .NET tests
 
 [![NuGet Version](https://img.shields.io/nuget/vpre/DotnetTest.Mcp)](https://www.nuget.org/packages/DotnetTest.Mcp/)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/DotnetTest.Mcp)](https://www.nuget.org/packages/DotnetTest.Mcp/)
