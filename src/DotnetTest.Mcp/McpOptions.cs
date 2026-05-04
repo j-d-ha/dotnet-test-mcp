@@ -12,6 +12,10 @@ public sealed class McpOptions
     [ConfigurationKeyName("TESTS_DIRECTORY_NAME")]
     public string TestsDirectoryName { get; set; } = "tests";
 
+    /// <summary>Disables CTRF report arguments when test hosts do not support them. Environment variable: DISABLE_CTRF.</summary>
+    [ConfigurationKeyName("DISABLE_CTRF")]
+    public bool DisableCtrf { get; set; }
+
     /// <summary>Full path to the tests directory, derived from <see cref="WorkingDirectory" /> and <see cref="TestsDirectoryName" />.</summary>
     public string TestsDirectoryPath => Path.Combine(WorkingDirectory, TestsDirectoryName);
 }

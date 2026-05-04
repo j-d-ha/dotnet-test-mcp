@@ -100,6 +100,7 @@ project.
 |------------------------|----------------------------------------------------------------|-------------------|
 | `WORKING_DIRECTORY`    | Override the solution root (e.g. if the server runs elsewhere) | Current directory |
 | `TESTS_DIRECTORY_NAME` | Override the folder name containing test projects              | `tests`           |
+| `DISABLE_CTRF`         | Disable `--report-ctrf` arguments for hosts without CTRF support (e.g., some TUnit setups) | `false` |
 
 ## Building
 

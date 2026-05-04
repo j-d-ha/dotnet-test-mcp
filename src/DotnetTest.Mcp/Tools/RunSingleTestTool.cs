@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
 
 namespace DotnetTest.Mcp.Tools;
@@ -9,10 +10,12 @@ namespace DotnetTest.Mcp.Tools;
 [McpServerToolType]
 public sealed class RunSingleTestTool(
     ICommandRunner commandRunner,
-    JsonSerializerOptions jsonOptions)
+    JsonSerializerOptions jsonOptions,
+    IOptions<McpOptions> options)
 {
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions.ValidateNotNull();
+    private readonly McpOptions _options = options.Value.ValidateNotNull();
 
     [McpServerTool(UseStructuredContent = true)]
     [Description("Runs a single dotnet test by fully qualified method name.")]
@@ -38,6 +41,7 @@ public sealed class RunSingleTestTool(
             _commandRunner,
             _jsonOptions,
             ["test", "--filter-method", trimmedQualifiedName],
+            _options.DisableCtrf,
             cancellationToken);
 
         if (runResult.Report is null)

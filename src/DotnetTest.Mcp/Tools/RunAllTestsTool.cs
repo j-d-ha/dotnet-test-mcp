@@ -2,18 +2,23 @@ using System.ComponentModel;
 using System.Text.Json;
 using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
 
 namespace DotnetTest.Mcp.Tools;
 
 [McpServerToolType]
-public sealed class RunAllTestsTool(ICommandRunner commandRunner, JsonSerializerOptions jsonOptions)
+public sealed class RunAllTestsTool(
+    ICommandRunner commandRunner,
+    JsonSerializerOptions jsonOptions,
+    IOptions<McpOptions> options)
 {
     private const int MaxFailingTests = 20;
     private const int MaxFailureDetails = 3;
 
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions.ValidateNotNull();
+    private readonly McpOptions _options = options.Value.ValidateNotNull();
 
     [McpServerTool(UseStructuredContent = true)]
     [Description("Runs all tests in the solution.")]
@@ -28,6 +33,7 @@ public sealed class RunAllTestsTool(ICommandRunner commandRunner, JsonSerializer
             _commandRunner,
             _jsonOptions,
             ["test"],
+            _options.DisableCtrf,
             cancellationToken);
 
         if (runResult.Report is null)

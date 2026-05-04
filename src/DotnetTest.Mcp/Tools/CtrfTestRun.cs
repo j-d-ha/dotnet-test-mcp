@@ -19,25 +19,28 @@ internal static class CtrfTestRun
         ICommandRunner commandRunner,
         JsonSerializerOptions jsonOptions,
         IReadOnlyList<string> arguments,
+        bool disableCtrf,
         CancellationToken cancellationToken)
     {
         var ctrfFileName = $"TestResults_{Guid.NewGuid():N}.ctrf";
         var tempPath = Path.GetTempPath();
         var fullCtrfPath = Path.Combine(tempPath, ctrfFileName);
 
-        var argumentsWithCtrf = new List<string>(arguments)
-        {
-            "--report-ctrf",
-            "--report-ctrf-filename",
-            ctrfFileName,
-            "--results-directory",
-            tempPath,
-            "--no-ansi",
-            "--no-progress",
-        };
+        var commandArguments = new List<string>(arguments);
+        if (!disableCtrf)
+            commandArguments.AddRange(
+            [
+                "--report-ctrf",
+                "--report-ctrf-filename",
+                ctrfFileName,
+                "--results-directory",
+                tempPath,
+                "--no-ansi",
+                "--no-progress",
+            ]);
 
         var commandResult = await commandRunner.RunAsync(
-            new CommandRequest("dotnet", argumentsWithCtrf.ToArray())
+            new CommandRequest("dotnet", commandArguments.ToArray())
             {
                 ThrowOnNonZeroExitCode = false,
             },
