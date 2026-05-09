@@ -28,6 +28,8 @@ public sealed class RunSingleTestTool(
         string qualifiedMethodName,
         [Description("Include stack trace in failure details. Default is false.")]
         bool includeStackTrace = false,
+        [Description("Optional project path to scope the method run to a single test project.")]
+        string? project = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(qualifiedMethodName))
@@ -36,16 +38,36 @@ public sealed class RunSingleTestTool(
                 nameof(qualifiedMethodName));
 
         var trimmedQualifiedName = qualifiedMethodName.Trim();
+        var trimmedProject = string.IsNullOrWhiteSpace(project) ? null : project.Trim();
+        var dialect = TestRunnerDialectDetector.Detect(trimmedProject, _options);
+        var supportsCtrf = dialect != TestRunnerDialect.TUnit;
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
             _jsonOptions,
-            ["test", "--filter-method", trimmedQualifiedName],
+            TestCommandBuilder.BuildSingleTestRun(dialect, trimmedQualifiedName, trimmedProject),
             _options.DisableCtrf,
+            supportsCtrf,
             cancellationToken);
 
         if (runResult.Report is null)
         {
+            if (!supportsCtrf && runResult.CommandResult.ExitCode is 0 or 1)
+            {
+                var summary = ConsoleTestSummaryParser.Parse(runResult.CommandResult);
+                var testOutcome = ConsoleTestSummaryParser.GetOutcome(runResult.CommandResult, summary);
+                return CreateResult(
+                    testOutcome,
+                    testOutcome == TestOutcome.Passed ? "Test passed." : ConsoleTestSummaryParser.GetMessage(testOutcome),
+                    summary.DurationMilliseconds,
+                    error: testOutcome == TestOutcome.Error
+                        ? CtrfTestRun.BuildErrorInfo(
+                            runResult.CommandResult,
+                            null,
+                            CtrfTestRun.ClassifyErrorKind(runResult.CommandResult, false, null))
+                        : null);
+            }
+
             if (runResult is { ReportFileFound: false, CommandResult.ExitCode: 8 })
                 return CreateResult(TestOutcome.NotFound, "No tests matched the method filter.");
 

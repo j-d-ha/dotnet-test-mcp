@@ -32,17 +32,27 @@ public sealed class RunAllTestsForProjectTool(
             throw new ArgumentException("Project path is required.", nameof(projectPath));
 
         var trimmedProjectPath = projectPath.Trim();
+        var dialect = TestRunnerDialectDetector.Detect(trimmedProjectPath, _options);
+        var supportsCtrf = dialect != TestRunnerDialect.TUnit;
         var outputOptions = FailureFormatting.CreateOptions(includeStackTrace);
+
+        var arguments = dialect == TestRunnerDialect.TUnit
+            ? new[] { "run", "--project", trimmedProjectPath, "--", "--no-ansi", "--disable-logo" }
+            : ["test", "--project", trimmedProjectPath];
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
             _jsonOptions,
-            ["test", "--project", trimmedProjectPath],
+            arguments,
             _options.DisableCtrf,
+            supportsCtrf,
             cancellationToken);
 
         if (runResult.Report is null)
         {
+            if (!supportsCtrf && runResult.CommandResult.ExitCode is 0 or 1)
+                return CreateResultFromConsole(trimmedProjectPath, runResult.CommandResult);
+
             if (runResult is { ReportFileFound: false, CommandResult.ExitCode: 8 })
                 return CreateResult(
                     trimmedProjectPath,
@@ -127,6 +137,34 @@ public sealed class RunAllTestsForProjectTool(
             failureDetails,
             hasMoreFailures,
             error);
+
+    private static Result CreateResultFromConsole(string projectPath, CommandResult commandResult)
+    {
+        var summary = ConsoleTestSummaryParser.Parse(commandResult);
+        var outcome = ConsoleTestSummaryParser.GetOutcome(commandResult, summary);
+        return new Result(
+            "project",
+            projectPath,
+            outcome,
+            ConsoleTestSummaryParser.GetMessage(outcome),
+            commandResult.ExitCode,
+            summary.TestCount,
+            summary.Passed,
+            summary.Failed,
+            summary.Skipped,
+            summary.Pending,
+            summary.Other,
+            summary.DurationMilliseconds,
+            [],
+            [],
+            false,
+            outcome == TestOutcome.Error
+                ? CtrfTestRun.BuildErrorInfo(
+                    commandResult,
+                    null,
+                    CtrfTestRun.ClassifyErrorKind(commandResult, false, null))
+                : null);
+    }
 
     private Result CreateResultFromReport(
         string projectPath,

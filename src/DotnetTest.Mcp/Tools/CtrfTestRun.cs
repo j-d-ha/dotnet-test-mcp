@@ -21,13 +21,28 @@ internal static class CtrfTestRun
         IReadOnlyList<string> arguments,
         bool disableCtrf,
         CancellationToken cancellationToken)
+        => await ExecuteAsync(
+            commandRunner,
+            jsonOptions,
+            arguments,
+            disableCtrf,
+            supportsCtrf: true,
+            cancellationToken);
+
+    internal static async Task<Result> ExecuteAsync(
+        ICommandRunner commandRunner,
+        JsonSerializerOptions jsonOptions,
+        IReadOnlyList<string> arguments,
+        bool disableCtrf,
+        bool supportsCtrf,
+        CancellationToken cancellationToken)
     {
         var ctrfFileName = $"TestResults_{Guid.NewGuid():N}.ctrf";
         var tempPath = Path.GetTempPath();
         var fullCtrfPath = Path.Combine(tempPath, ctrfFileName);
 
         var commandArguments = new List<string>(arguments);
-        if (!disableCtrf)
+        if (!disableCtrf && supportsCtrf)
             commandArguments.AddRange(
             [
                 "--report-ctrf",

@@ -26,23 +26,32 @@ public sealed class RunAllTestsInClassTool(
         [Description("Fully qualified test class name to run.")] string className,
         [Description("Include stack traces in failure details. Default is false.")]
         bool includeStackTrace = false,
+        [Description("Optional project path to scope the class run to a single test project.")]
+        string? project = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(className))
             throw new ArgumentException("Class name is required.", nameof(className));
 
         var trimmedClassName = className.Trim();
+        var trimmedProject = string.IsNullOrWhiteSpace(project) ? null : project.Trim();
+        var dialect = TestRunnerDialectDetector.Detect(trimmedProject, _options);
+        var supportsCtrf = dialect != TestRunnerDialect.TUnit;
         var outputOptions = FailureFormatting.CreateOptions(includeStackTrace);
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
             _jsonOptions,
-            ["test", "--filter-class", trimmedClassName],
+            TestCommandBuilder.BuildClassRun(dialect, trimmedClassName, trimmedProject),
             _options.DisableCtrf,
+            supportsCtrf,
             cancellationToken);
 
         if (runResult.Report is null)
         {
+            if (!supportsCtrf && runResult.CommandResult.ExitCode is 0 or 1)
+                return CreateResultFromConsole(trimmedClassName, runResult.CommandResult);
+
             if (runResult is { ReportFileFound: false, CommandResult.ExitCode: 8 })
                 return CreateResult(
                     trimmedClassName,
@@ -127,6 +136,34 @@ public sealed class RunAllTestsInClassTool(
             failureDetails,
             hasMoreFailures,
             error);
+
+    private static Result CreateResultFromConsole(string className, CommandResult commandResult)
+    {
+        var summary = ConsoleTestSummaryParser.Parse(commandResult);
+        var outcome = ConsoleTestSummaryParser.GetOutcome(commandResult, summary);
+        return new Result(
+            "class",
+            className,
+            outcome,
+            ConsoleTestSummaryParser.GetMessage(outcome),
+            commandResult.ExitCode,
+            summary.TestCount,
+            summary.Passed,
+            summary.Failed,
+            summary.Skipped,
+            summary.Pending,
+            summary.Other,
+            summary.DurationMilliseconds,
+            [],
+            [],
+            false,
+            outcome == TestOutcome.Error
+                ? CtrfTestRun.BuildErrorInfo(
+                    commandResult,
+                    null,
+                    CtrfTestRun.ClassifyErrorKind(commandResult, false, null))
+                : null);
+    }
 
     private Result CreateResultFromReport(
         string className,
