@@ -6,6 +6,8 @@ namespace DotnetTest.Mcp.Tools;
 
 internal static class CtrfTestRun
 {
+    private static readonly TimeSpan DefaultTestRunTimeout = TimeSpan.FromSeconds(55);
+
     internal sealed record Result(
         CommandResult CommandResult,
         CtrfReport? Report,
@@ -97,6 +99,7 @@ internal static class CtrfTestRun
             {
                 WorkingDirectory = workingDirectory,
                 ThrowOnNonZeroExitCode = false,
+                Timeout = DefaultTestRunTimeout,
             },
             cancellationToken);
 
