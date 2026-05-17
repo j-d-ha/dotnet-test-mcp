@@ -26,13 +26,16 @@ public sealed class RunAllTestsForProjectTool(
         [Description("Path to the project file (.csproj) to test.")] string projectPath,
         [Description("Include stack traces in failure details. Default is false.")]
         bool includeStackTrace = false,
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
+        string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(projectPath))
             throw new ArgumentException("Project path is required.", nameof(projectPath));
 
         var trimmedProjectPath = projectPath.Trim();
-        var dialect = TestRunnerDialectDetector.Detect(trimmedProjectPath, _options);
+        var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
+        var dialect = TestRunnerDialectDetector.Detect(trimmedProjectPath, _options, trimmedWorkingDirectory);
         var supportsCtrf = dialect != TestRunnerDialect.TUnit;
         var outputOptions = FailureFormatting.CreateOptions(includeStackTrace);
 
@@ -46,6 +49,7 @@ public sealed class RunAllTestsForProjectTool(
             arguments,
             _options.DisableCtrf,
             supportsCtrf,
+            trimmedWorkingDirectory,
             cancellationToken);
 
         if (runResult.Report is null)

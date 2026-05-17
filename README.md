@@ -102,6 +102,31 @@ project.
 | `TESTS_DIRECTORY_NAME` | Override the folder name containing test projects              | `tests`           |
 | `DISABLE_CTRF`         | Disable `--report-ctrf` arguments for hosts without CTRF support (e.g., some TUnit setups) | `false` |
 
+## Per-call working directory override
+
+All test tools now accept an optional `workingDirectory` argument. This is useful when the MCP server process is started outside the target repository root (for example when working with git worktrees).
+
+Supported tools:
+
+- `ListTestProjects`
+- `ListTestsSummary`
+- `RunSingleTest`
+- `RunAllTests`
+- `RunAllTestsForProject`
+- `RunAllTestsInClass`
+
+### Precedence
+
+Yes — the per-call `workingDirectory` has higher priority than the `WORKING_DIRECTORY` environment variable.
+
+Resolution order is:
+
+1. `workingDirectory` argument passed to the tool call
+2. `WORKING_DIRECTORY` environment variable
+3. Current process directory
+
+This lets each MCP tool invocation target a different worktree safely without restarting the MCP server.
+
 ## Building
 
 ```bash

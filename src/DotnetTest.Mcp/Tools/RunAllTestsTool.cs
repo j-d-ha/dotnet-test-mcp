@@ -25,15 +25,19 @@ public sealed class RunAllTestsTool(
     public async Task<Result> RunAllTests(
         [Description("Include stack traces in failure details. Default is false.")]
         bool includeStackTrace = false,
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
+        string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
         var outputOptions = FailureFormatting.CreateOptions(includeStackTrace);
+        var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
             _jsonOptions,
             ["test"],
             _options.DisableCtrf,
+            trimmedWorkingDirectory,
             cancellationToken);
 
         if (runResult.Report is null)

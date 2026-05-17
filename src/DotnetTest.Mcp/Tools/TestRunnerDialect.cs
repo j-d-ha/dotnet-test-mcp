@@ -9,14 +9,21 @@ internal enum TestRunnerDialect
 
 internal static class TestRunnerDialectDetector
 {
-    internal static TestRunnerDialect Detect(string? projectPath, McpOptions options)
+    internal static TestRunnerDialect Detect(
+        string? projectPath,
+        McpOptions options,
+        string? workingDirectory = null)
     {
         if (string.IsNullOrWhiteSpace(projectPath))
             return TestRunnerDialect.Unknown;
 
+        var effectiveWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
+            ? options.WorkingDirectory
+            : workingDirectory;
+
         var fullPath = Path.IsPathRooted(projectPath)
             ? projectPath
-            : Path.Combine(options.WorkingDirectory, projectPath);
+            : Path.Combine(effectiveWorkingDirectory, projectPath);
 
         if (!File.Exists(fullPath))
             return TestRunnerDialect.Unknown;

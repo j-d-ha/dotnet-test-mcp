@@ -30,6 +30,8 @@ public sealed class RunSingleTestTool(
         bool includeStackTrace = false,
         [Description("Optional project path to scope the method run to a single test project.")]
         string? project = null,
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
+        string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(qualifiedMethodName))
@@ -39,7 +41,8 @@ public sealed class RunSingleTestTool(
 
         var trimmedQualifiedName = qualifiedMethodName.Trim();
         var trimmedProject = string.IsNullOrWhiteSpace(project) ? null : project.Trim();
-        var dialect = TestRunnerDialectDetector.Detect(trimmedProject, _options);
+        var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
+        var dialect = TestRunnerDialectDetector.Detect(trimmedProject, _options, trimmedWorkingDirectory);
         var supportsCtrf = dialect != TestRunnerDialect.TUnit;
 
         var runResult = await CtrfTestRun.ExecuteAsync(
@@ -48,6 +51,7 @@ public sealed class RunSingleTestTool(
             TestCommandBuilder.BuildSingleTestRun(dialect, trimmedQualifiedName, trimmedProject),
             _options.DisableCtrf,
             supportsCtrf,
+            trimmedWorkingDirectory,
             cancellationToken);
 
         if (runResult.Report is null)

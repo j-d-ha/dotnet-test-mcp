@@ -6,9 +6,6 @@ namespace DotnetTest.Mcp.Tools;
 
 internal static class CtrfTestRun
 {
-    private const int DefaultErrorMaxChars = 8000;
-    private const int DefaultErrorMaxLines = 200;
-
     internal sealed record Result(
         CommandResult CommandResult,
         CtrfReport? Report,
@@ -20,6 +17,7 @@ internal static class CtrfTestRun
         JsonSerializerOptions jsonOptions,
         IReadOnlyList<string> arguments,
         bool disableCtrf,
+        string? workingDirectory,
         CancellationToken cancellationToken)
         => await ExecuteAsync(
             commandRunner,
@@ -27,6 +25,7 @@ internal static class CtrfTestRun
             arguments,
             disableCtrf,
             supportsCtrf: true,
+            workingDirectory,
             cancellationToken);
 
     internal static async Task<Result> ExecuteAsync(
@@ -35,6 +34,45 @@ internal static class CtrfTestRun
         IReadOnlyList<string> arguments,
         bool disableCtrf,
         bool supportsCtrf,
+        string? workingDirectory,
+        CancellationToken cancellationToken)
+    {
+        var ctrfEnabled = !disableCtrf && supportsCtrf;
+
+        var firstAttempt = await ExecuteAttemptAsync(
+            commandRunner,
+            jsonOptions,
+            arguments,
+            ctrfEnabled,
+            workingDirectory,
+            cancellationToken);
+
+        if (!ctrfEnabled || firstAttempt.Report is not null)
+            return firstAttempt;
+
+        var firstAttemptKind = ClassifyErrorKind(
+            firstAttempt.CommandResult,
+            firstAttempt.ReportFileFound,
+            firstAttempt.ReadErrorMessage);
+
+        if (firstAttemptKind != ErrorKind.InvocationError)
+            return firstAttempt;
+
+        return await ExecuteAttemptAsync(
+            commandRunner,
+            jsonOptions,
+            arguments,
+            includeCtrfArgs: false,
+            workingDirectory,
+            cancellationToken);
+    }
+
+    private static async Task<Result> ExecuteAttemptAsync(
+        ICommandRunner commandRunner,
+        JsonSerializerOptions jsonOptions,
+        IReadOnlyList<string> arguments,
+        bool includeCtrfArgs,
+        string? workingDirectory,
         CancellationToken cancellationToken)
     {
         var ctrfFileName = $"TestResults_{Guid.NewGuid():N}.ctrf";
@@ -42,7 +80,7 @@ internal static class CtrfTestRun
         var fullCtrfPath = Path.Combine(tempPath, ctrfFileName);
 
         var commandArguments = new List<string>(arguments);
-        if (!disableCtrf && supportsCtrf)
+        if (includeCtrfArgs)
             commandArguments.AddRange(
             [
                 "--report-ctrf",
@@ -57,6 +95,7 @@ internal static class CtrfTestRun
         var commandResult = await commandRunner.RunAsync(
             new CommandRequest("dotnet", commandArguments.ToArray())
             {
+                WorkingDirectory = workingDirectory,
                 ThrowOnNonZeroExitCode = false,
             },
             cancellationToken);
@@ -141,14 +180,21 @@ internal static class CtrfTestRun
         string? readErrorMessage,
         ErrorKind errorKind)
     {
-        var stderr = TextTruncation.Truncate(
-            commandResult.StandardError,
-            DefaultErrorMaxChars,
-            DefaultErrorMaxLines);
-        var stdout = TextTruncation.Truncate(
-            commandResult.StandardOutput,
-            DefaultErrorMaxChars,
-            DefaultErrorMaxLines);
+        var stderr = string.IsNullOrEmpty(commandResult.StandardError)
+            ? null
+            : new TruncatedText(
+                commandResult.StandardError,
+                false,
+                commandResult.StandardError.Length,
+                commandResult.StandardError.Count(c => c == '\n') + 1);
+
+        var stdout = string.IsNullOrEmpty(commandResult.StandardOutput)
+            ? null
+            : new TruncatedText(
+                commandResult.StandardOutput,
+                false,
+                commandResult.StandardOutput.Length,
+                commandResult.StandardOutput.Count(c => c == '\n') + 1);
 
         var reason = readErrorMessage;
         if (string.IsNullOrWhiteSpace(reason))

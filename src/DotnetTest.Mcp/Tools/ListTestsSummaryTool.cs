@@ -10,6 +10,8 @@ namespace DotnetTest.Mcp.Tools;
 public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandRunner commandRunner)
 {
     private const int MaxReturnedTests = 200;
+    private const int MaxProjectsToScan = 8;
+    private static readonly TimeSpan PerProjectListTestsTimeout = TimeSpan.FromSeconds(20);
 
     private readonly McpOptions _options = options.ValidateNotNull().Value;
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
@@ -23,14 +25,21 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
         bool includeTests = false,
         [Description("When true, treat zero discovered tests as an error.")] bool requireTests =
             false,
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
+        string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
         var trimmedPrefix = string.IsNullOrWhiteSpace(prefix) ? null : prefix.Trim();
+        var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
 
         var testProjects = await TestProjectDiscovery.ListAsync(
             _commandRunner,
             _options,
+            trimmedWorkingDirectory,
             cancellationToken);
+
+        if (testProjects.Length > MaxProjectsToScan)
+            testProjects = testProjects.Take(MaxProjectsToScan).ToArray();
 
         if (testProjects.Length == 0)
         {
@@ -78,6 +87,7 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
                 projectPath,
                 trimmedPrefix,
                 requireTests,
+                trimmedWorkingDirectory,
                 cancellationToken);
             projectResults.Add(discovery.ProjectResult);
             if (discovery.Tests.Length > 0)
@@ -147,6 +157,7 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
         string projectPath,
         string? prefix,
         bool requireTests,
+        string? workingDirectory,
         CancellationToken cancellationToken)
     {
         var arguments = new List<string>
@@ -160,7 +171,12 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
         };
 
         var commandResult = await _commandRunner.RunAsync(
-            new CommandRequest("dotnet", arguments.ToArray()) { ThrowOnNonZeroExitCode = false },
+            new CommandRequest("dotnet", arguments.ToArray())
+            {
+                WorkingDirectory = workingDirectory,
+                ThrowOnNonZeroExitCode = false,
+                Timeout = PerProjectListTestsTimeout,
+            },
             cancellationToken);
 
         var tests = TestListParser.ExtractTests(commandResult.StandardOutputLines);
@@ -172,6 +188,38 @@ public sealed class ListTestsSummaryTool(IOptions<McpOptions> options, ICommandR
         var exitCode = commandResult.ExitCode;
         if (exitCode != 0)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                var timeoutError = new ErrorInfo(
+                    ErrorKind.DiscoveryFailed,
+                    "Project discovery timed out.",
+                    string.IsNullOrEmpty(commandResult.StandardOutput)
+                        ? null
+                        : new TruncatedText(
+                            commandResult.StandardOutput,
+                            false,
+                            commandResult.StandardOutput.Length,
+                            commandResult.StandardOutput.Count(c => c == '\n') + 1),
+                    string.IsNullOrEmpty(commandResult.StandardError)
+                        ? null
+                        : new TruncatedText(
+                            commandResult.StandardError,
+                            false,
+                            commandResult.StandardError.Length,
+                            commandResult.StandardError.Count(c => c == '\n') + 1));
+
+                return new ProjectDiscovery(
+                    new ProjectDiscoveryResult(
+                        projectPath,
+                        TestOutcome.Error,
+                        timeoutError.Reason,
+                        exitCode,
+                        testCount,
+                        null,
+                        timeoutError),
+                    tests);
+            }
+
             var errorKind = CtrfTestRun.ClassifyErrorKind(commandResult, true, null);
             if (errorKind == ErrorKind.NoTestsDiscovered && !requireTests)
             {
