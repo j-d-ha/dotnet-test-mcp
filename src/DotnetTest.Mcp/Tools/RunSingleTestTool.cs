@@ -42,6 +42,19 @@ public sealed class RunSingleTestTool(
         var trimmedQualifiedName = qualifiedMethodName.Trim();
         var trimmedProject = string.IsNullOrWhiteSpace(project) ? null : project.Trim();
         var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
+
+        if (trimmedProject is null)
+        {
+            var projects = await TestProjectDiscovery.ListAsync(
+                _commandRunner,
+                _options,
+                trimmedWorkingDirectory,
+                cancellationToken);
+
+            if (projects.Length > 0)
+                trimmedProject = projects[0];
+        }
+
         var dialect = TestRunnerDialectDetector.Detect(trimmedProject, _options, trimmedWorkingDirectory);
         var supportsCtrf = dialect != TestRunnerDialect.TUnit;
 
@@ -51,6 +64,7 @@ public sealed class RunSingleTestTool(
             TestCommandBuilder.BuildSingleTestRun(dialect, trimmedQualifiedName, trimmedProject),
             _options.DisableCtrf,
             supportsCtrf,
+            _options,
             trimmedWorkingDirectory,
             cancellationToken);
 

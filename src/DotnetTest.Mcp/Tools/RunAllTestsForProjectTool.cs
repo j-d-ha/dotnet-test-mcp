@@ -39,9 +39,7 @@ public sealed class RunAllTestsForProjectTool(
         var supportsCtrf = dialect != TestRunnerDialect.TUnit;
         var outputOptions = FailureFormatting.CreateOptions(includeStackTrace);
 
-        var arguments = dialect == TestRunnerDialect.TUnit
-            ? new[] { "run", "--project", trimmedProjectPath, "--", "--no-ansi", "--disable-logo" }
-            : ["test", "--project", trimmedProjectPath];
+        var arguments = TestCommandBuilder.BuildProjectRun(dialect, trimmedProjectPath);
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
@@ -49,6 +47,7 @@ public sealed class RunAllTestsForProjectTool(
             arguments,
             _options.DisableCtrf,
             supportsCtrf,
+            _options,
             trimmedWorkingDirectory,
             cancellationToken);
 

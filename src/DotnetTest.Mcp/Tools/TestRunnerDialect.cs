@@ -57,21 +57,20 @@ internal static class TestCommandBuilder
         string className,
         string? project)
     {
-        if (dialect == TestRunnerDialect.TUnit && !string.IsNullOrWhiteSpace(project))
-            return
+        if (dialect == TestRunnerDialect.TUnit)
+        {
+            var shortClassName = GetTypeName(className);
+            var arguments = BuildTestCommandPrefix(dialect, project);
+            arguments.AddRange(
             [
-                "run",
-                "--project",
-                project,
-                "--",
-                "--no-ansi",
-                "--disable-logo",
                 "--treenode-filter",
-                $"/*/*/{className}/*",
-            ];
+                $"/*/*/{shortClassName}/*",
+            ]);
+            return arguments.ToArray();
+        }
 
         if (!string.IsNullOrWhiteSpace(project))
-            return ["test", "--project", project, "--filter-class", className];
+            return ["test", project, "--filter-class", className];
 
         return ["test", "--filter-class", className];
     }
@@ -81,26 +80,51 @@ internal static class TestCommandBuilder
         string qualifiedMethodName,
         string? project)
     {
-        if (dialect == TestRunnerDialect.TUnit && !string.IsNullOrWhiteSpace(project))
+        if (dialect == TestRunnerDialect.TUnit)
         {
             var (className, methodName) = SplitQualifiedMethodName(qualifiedMethodName);
-            return
+            var arguments = BuildTestCommandPrefix(dialect, project);
+            arguments.AddRange(
             [
-                "run",
-                "--project",
-                project,
-                "--",
-                "--no-ansi",
-                "--disable-logo",
                 "--treenode-filter",
                 $"/*/*/{className}/{methodName}",
-            ];
+            ]);
+            return arguments.ToArray();
         }
 
         if (!string.IsNullOrWhiteSpace(project))
-            return ["test", "--project", project, "--filter-method", qualifiedMethodName];
+            return ["test", project, "--filter-method", qualifiedMethodName];
 
         return ["test", "--filter-method", qualifiedMethodName];
+    }
+
+    internal static string[] BuildProjectRun(TestRunnerDialect dialect, string project)
+        => BuildTestCommandPrefix(dialect, project).ToArray();
+
+    private static List<string> BuildTestCommandPrefix(TestRunnerDialect dialect, string? project)
+    {
+        if (dialect == TestRunnerDialect.TUnit)
+        {
+            if (!string.IsNullOrWhiteSpace(project))
+            {
+                return
+                [
+                    "run",
+                    "--project",
+                    project,
+                    "--",
+                    "--no-ansi",
+                    "--disable-logo",
+                ];
+            }
+
+            return ["test", "--", "--no-ansi", "--disable-logo"];
+        }
+
+        if (!string.IsNullOrWhiteSpace(project))
+            return ["test", project];
+
+        return ["test"];
     }
 
     private static (string ClassName, string MethodName) SplitQualifiedMethodName(string qualifiedMethodName)
@@ -111,11 +135,14 @@ internal static class TestCommandBuilder
 
         var methodName = qualifiedMethodName[(methodSeparator + 1)..];
         var classQualifiedName = qualifiedMethodName[..methodSeparator];
-        var classSeparator = classQualifiedName.LastIndexOf('.');
-        var className = classSeparator < 0
-            ? classQualifiedName
-            : classQualifiedName[(classSeparator + 1)..];
+        return (GetTypeName(classQualifiedName), methodName);
+    }
 
-        return (className, methodName);
+    private static string GetTypeName(string qualifiedTypeName)
+    {
+        var classSeparator = qualifiedTypeName.LastIndexOf('.');
+        return classSeparator < 0
+            ? qualifiedTypeName
+            : qualifiedTypeName[(classSeparator + 1)..];
     }
 }

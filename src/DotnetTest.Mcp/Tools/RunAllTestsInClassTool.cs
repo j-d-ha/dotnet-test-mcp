@@ -66,6 +66,7 @@ public sealed class RunAllTestsInClassTool(
             TestCommandBuilder.BuildClassRun(dialect, trimmedClassName, trimmedProject),
             _options.DisableCtrf,
             supportsCtrf,
+            _options,
             trimmedWorkingDirectory,
             cancellationToken);
 

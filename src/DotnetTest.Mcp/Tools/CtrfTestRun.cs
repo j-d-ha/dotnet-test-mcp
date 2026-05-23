@@ -6,7 +6,7 @@ namespace DotnetTest.Mcp.Tools;
 
 internal static class CtrfTestRun
 {
-    private static readonly TimeSpan DefaultTestRunTimeout = TimeSpan.FromSeconds(55);
+    private static readonly TimeSpan DefaultTestRunTimeout = TimeSpan.FromSeconds(180);
 
     internal sealed record Result(
         CommandResult CommandResult,
@@ -14,11 +14,25 @@ internal static class CtrfTestRun
         bool ReportFileFound,
         string? ReadErrorMessage);
 
+    internal sealed record RunOptions(TimeSpan Timeout, int? MaxOutputChars);
+
+    internal static RunOptions CreateRunOptions(McpOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var timeout = options.TestRunTimeoutSeconds > 0
+            ? TimeSpan.FromSeconds(options.TestRunTimeoutSeconds)
+            : DefaultTestRunTimeout;
+
+        return new RunOptions(timeout, MaxOutputChars: null);
+    }
+
     internal static async Task<Result> ExecuteAsync(
         ICommandRunner commandRunner,
         JsonSerializerOptions jsonOptions,
         IReadOnlyList<string> arguments,
         bool disableCtrf,
+        McpOptions options,
         string? workingDirectory,
         CancellationToken cancellationToken)
         => await ExecuteAsync(
@@ -27,6 +41,7 @@ internal static class CtrfTestRun
             arguments,
             disableCtrf,
             supportsCtrf: true,
+            options,
             workingDirectory,
             cancellationToken);
 
@@ -36,16 +51,19 @@ internal static class CtrfTestRun
         IReadOnlyList<string> arguments,
         bool disableCtrf,
         bool supportsCtrf,
+        McpOptions options,
         string? workingDirectory,
         CancellationToken cancellationToken)
     {
         var ctrfEnabled = !disableCtrf && supportsCtrf;
+        var runOptions = CreateRunOptions(options);
 
         var firstAttempt = await ExecuteAttemptAsync(
             commandRunner,
             jsonOptions,
             arguments,
             ctrfEnabled,
+            runOptions,
             workingDirectory,
             cancellationToken);
 
@@ -65,6 +83,7 @@ internal static class CtrfTestRun
             jsonOptions,
             arguments,
             includeCtrfArgs: false,
+            runOptions,
             workingDirectory,
             cancellationToken);
     }
@@ -74,6 +93,7 @@ internal static class CtrfTestRun
         JsonSerializerOptions jsonOptions,
         IReadOnlyList<string> arguments,
         bool includeCtrfArgs,
+        RunOptions runOptions,
         string? workingDirectory,
         CancellationToken cancellationToken)
     {
@@ -99,7 +119,8 @@ internal static class CtrfTestRun
             {
                 WorkingDirectory = workingDirectory,
                 ThrowOnNonZeroExitCode = false,
-                Timeout = DefaultTestRunTimeout,
+                Timeout = runOptions.Timeout,
+                MaxOutputChars = runOptions.MaxOutputChars,
             },
             cancellationToken);
 

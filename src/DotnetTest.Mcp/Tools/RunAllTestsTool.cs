@@ -37,6 +37,7 @@ public sealed class RunAllTestsTool(
             _jsonOptions,
             ["test"],
             _options.DisableCtrf,
+            _options,
             trimmedWorkingDirectory,
             cancellationToken);
 

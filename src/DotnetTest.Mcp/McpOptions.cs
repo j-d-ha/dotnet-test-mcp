@@ -16,6 +16,10 @@ public sealed class McpOptions
     [ConfigurationKeyName("DISABLE_CTRF")]
     public bool DisableCtrf { get; set; }
 
+    /// <summary>Timeout in seconds for dotnet test/run invocations. Environment variable: TEST_RUN_TIMEOUT_SECONDS.</summary>
+    [ConfigurationKeyName("TEST_RUN_TIMEOUT_SECONDS")]
+    public int TestRunTimeoutSeconds { get; set; } = 180;
+
     /// <summary>Full path to the tests directory, derived from <see cref="WorkingDirectory" /> and <see cref="TestsDirectoryName" />.</summary>
     public string TestsDirectoryPath => Path.Combine(WorkingDirectory, TestsDirectoryName);
 }
