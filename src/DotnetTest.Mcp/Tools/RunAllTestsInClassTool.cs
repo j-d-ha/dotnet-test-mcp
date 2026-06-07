@@ -8,10 +8,7 @@ using ModelContextProtocol.Server;
 namespace DotnetTest.Mcp.Tools;
 
 [McpServerToolType]
-public sealed class RunAllTestsInClassTool(
-    ICommandRunner commandRunner,
-    JsonSerializerOptions jsonOptions,
-    IOptions<McpOptions> options)
+public sealed class RunAllTestsInClassTool(ICommandRunner commandRunner, JsonSerializerOptions jsonOptions, IOptions<McpOptions> options)
 {
     private const int MaxFailingTests = 20;
     private const int MaxFailureDetails = 3;
@@ -24,28 +21,23 @@ public sealed class RunAllTestsInClassTool(
     [Description("Runs all tests in a given test class.")]
     public async Task<Result> RunAllTestsInClass(
         [Description("Fully qualified test class name to run.")] string className,
-        [Description("Include stack traces in failure details. Default is false.")]
-        bool includeStackTrace = false,
-        [Description("Optional project path to scope the class run to a single test project.")]
-        string? project = null,
-        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
-        string? workingDirectory = null,
+        [Description("Include stack traces in failure details. Default is false.")] bool includeStackTrace = false,
+        [Description("Optional project path to scope the class run to a single test project.")] string? project = null,
+        [Description("Alias for project, for clients that send projectPath.")] string? projectPath = null,
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")] string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(className))
             throw new ArgumentException("Class name is required.", nameof(className));
 
         var trimmedClassName = className.Trim();
-        var trimmedProject = string.IsNullOrWhiteSpace(project) ? null : project.Trim();
+        var requestedProject = string.IsNullOrWhiteSpace(project) ? projectPath : project;
+        var trimmedProject = string.IsNullOrWhiteSpace(requestedProject) ? null : requestedProject.Trim();
         var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
 
         if (trimmedProject is null)
         {
-            var projects = await TestProjectDiscovery.ListAsync(
-                _commandRunner,
-                _options,
-                trimmedWorkingDirectory,
-                cancellationToken);
+            var projects = await TestProjectDiscovery.ListAsync(_commandRunner, _options, trimmedWorkingDirectory, cancellationToken);
 
             if (projects.Length == 0)
             {
@@ -85,29 +77,17 @@ public sealed class RunAllTestsInClassTool(
                     false,
                     null);
 
-            var errorKind = CtrfTestRun.ClassifyErrorKind(
-                runResult.CommandResult,
-                runResult.ReportFileFound,
-                runResult.ReadErrorMessage);
+            var errorKind = CtrfTestRun.ClassifyErrorKind(runResult.CommandResult, runResult.ReportFileFound, runResult.ReadErrorMessage);
             var error = CtrfTestRun.BuildErrorInfo(
                 runResult.CommandResult,
                 runResult.ReadErrorMessage,
-                errorKind);
-            return CreateResult(
-                trimmedClassName,
-                TestOutcome.Error,
-                error.Reason,
-                runResult.CommandResult.ExitCode,
-                [],
-                false,
-                error);
+                errorKind,
+                "run_all_tests_in_class",
+                trimmedProject);
+            return CreateResult(trimmedClassName, TestOutcome.Error, error.Reason, runResult.CommandResult.ExitCode, [], false, error);
         }
 
-        return CreateResultFromReport(
-            trimmedClassName,
-            runResult.Report,
-            runResult.CommandResult,
-            outputOptions);
+        return CreateResultFromReport(trimmedClassName, runResult.Report, runResult.CommandResult, outputOptions);
     }
 
     [Description("Result of running all tests in a class.")]
@@ -123,16 +103,11 @@ public sealed class RunAllTestsInClassTool(
         [property: Description("Count of skipped tests when available.")] int Skipped,
         [property: Description("Count of pending tests when available.")] int Pending,
         [property: Description("Count of other-status tests when available.")] int Other,
-        [property: Description("Total duration in milliseconds when available; otherwise null.")]
-        int? DurationMilliseconds,
-        [property: Description("Up to the first 20 failing test names when available.")]
-        string[] FailingTests,
-        [property: Description("Structured details for up to 3 failed tests.")]
-        TestFailure[] FailureDetails,
-        [property: Description("True when more failed tests exist than returned.")]
-        bool HasMoreFailures,
-        [property: Description("Structured error details when Outcome is Error; otherwise null.")]
-        ErrorInfo? Error);
+        [property: Description("Total duration in milliseconds when available; otherwise null.")] int? DurationMilliseconds,
+        [property: Description("Up to the first 20 failing test names when available.")] string[] FailingTests,
+        [property: Description("Structured details for up to 3 failed tests.")] TestFailure[] FailureDetails,
+        [property: Description("True when more failed tests exist than returned.")] bool HasMoreFailures,
+        [property: Description("Structured error details when Outcome is Error; otherwise null.")] ErrorInfo? Error);
 
     private Result CreateResult(
         string className,
@@ -141,24 +116,7 @@ public sealed class RunAllTestsInClassTool(
         int exitCode,
         TestFailure[] failureDetails,
         bool hasMoreFailures,
-        ErrorInfo? error)
-        => new(
-            "class",
-            className,
-            outcome,
-            message,
-            exitCode,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            null,
-            [],
-            failureDetails,
-            hasMoreFailures,
-            error);
+        ErrorInfo? error) => new("class", className, outcome, message, exitCode, 0, 0, 0, 0, 0, 0, null, [], failureDetails, hasMoreFailures, error);
 
     private static Result CreateResultFromConsole(string className, CommandResult commandResult)
     {
@@ -184,7 +142,9 @@ public sealed class RunAllTestsInClassTool(
                 ? CtrfTestRun.BuildErrorInfo(
                     commandResult,
                     null,
-                    CtrfTestRun.ClassifyErrorKind(commandResult, false, null))
+                    CtrfTestRun.ClassifyErrorKind(commandResult, false, null),
+                    "run_all_tests_in_class",
+                    className)
                 : null);
     }
 
@@ -212,7 +172,7 @@ public sealed class RunAllTestsInClassTool(
         if (exitCode != 0 && exitCode != 8 && failed == 0)
         {
             var errorKind = CtrfTestRun.ClassifyErrorKind(commandResult, true, null);
-            var error = CtrfTestRun.BuildErrorInfo(commandResult, null, errorKind);
+            var error = CtrfTestRun.BuildErrorInfo(commandResult, null, errorKind, "run_all_tests_in_class", className);
             return new Result(
                 "class",
                 className,
@@ -251,8 +211,7 @@ public sealed class RunAllTestsInClassTool(
                 hasMoreFailures,
                 null);
 
-        var outcome =
-            failed > 0 ? TestOutcome.Failed : passed > 0 ? TestOutcome.Passed : TestOutcome.Skipped;
+        var outcome = failed > 0 ? TestOutcome.Failed : passed > 0 ? TestOutcome.Passed : TestOutcome.Skipped;
 
         var message = outcome switch
         {
@@ -281,27 +240,23 @@ public sealed class RunAllTestsInClassTool(
             null);
     }
 
-    private static int CountByStatus(IReadOnlyCollection<CtrfTest> tests, string status)
-        => tests.Count(test
-            => string.Equals(test.Status, status, StringComparison.OrdinalIgnoreCase));
+    private static int CountByStatus(IReadOnlyCollection<CtrfTest> tests, string status) => tests.Count(test
+        => string.Equals(test.Status, status, StringComparison.OrdinalIgnoreCase));
 
-    private static string[] ExtractFailingTests(IReadOnlyCollection<CtrfTest> tests)
-        => tests
-            .Where(test => string.Equals(test.Status, "failed", StringComparison.OrdinalIgnoreCase))
-            .Select(test => test.Name)
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.Ordinal)
-            .Take(MaxFailingTests)
-            .ToArray();
+    private static string[] ExtractFailingTests(IReadOnlyCollection<CtrfTest> tests) => tests
+        .Where(test => string.Equals(test.Status, "failed", StringComparison.OrdinalIgnoreCase))
+        .Select(test => test.Name)
+        .Where(name => !string.IsNullOrWhiteSpace(name))
+        .Distinct(StringComparer.Ordinal)
+        .Take(MaxFailingTests)
+        .ToArray();
 
     private static TestFailure[] ExtractFailureDetails(
         IReadOnlyCollection<CtrfTest> tests,
         FailureFormatting.FailureOutputOptions outputOptions,
         out bool hasMoreFailures)
     {
-        var failures = tests.Where(test
-                => string.Equals(test.Status, "failed", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var failures = tests.Where(test => string.Equals(test.Status, "failed", StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (failures.Count == 0)
         {

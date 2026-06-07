@@ -26,4 +26,17 @@ public sealed record CommandResult(
     string StandardError,
     string[] StandardOutputLines,
     string[] StandardErrorLines,
-    TimeSpan Duration);
+    TimeSpan Duration)
+{
+    public string? FileName { get; init; }
+
+    public string[] Arguments { get; init; } = [];
+
+    public string? WorkingDirectory { get; init; }
+
+    public string? ExceptionType { get; init; }
+
+    public string? ExceptionMessage { get; init; }
+
+    public string? ExceptionStackTrace { get; init; }
+}

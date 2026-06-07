@@ -15,9 +15,9 @@ public sealed class ProcessCommandRunnerTests
             new CommandRequest(
                 "bash",
                 "-lc",
-                "echo raw-stdout; echo raw-stderr >&2; sleep 5")
+                "printf 'raw-stdout\\n'; printf 'raw-stderr\\n' >&2; sleep 5")
             {
-                Timeout = TimeSpan.FromMilliseconds(200),
+                Timeout = TimeSpan.FromSeconds(1),
                 ThrowOnNonZeroExitCode = false,
             });
 

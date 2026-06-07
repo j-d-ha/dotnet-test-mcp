@@ -8,10 +8,7 @@ using ModelContextProtocol.Server;
 namespace DotnetTest.Mcp.Tools;
 
 [McpServerToolType]
-public sealed class RunSingleTestTool(
-    ICommandRunner commandRunner,
-    JsonSerializerOptions jsonOptions,
-    IOptions<McpOptions> options)
+public sealed class RunSingleTestTool(ICommandRunner commandRunner, JsonSerializerOptions jsonOptions, IOptions<McpOptions> options)
 {
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions.ValidateNotNull();
@@ -22,34 +19,27 @@ public sealed class RunSingleTestTool(
     public async Task<Result> RunSingleTest(
         [Description(
             """
-            Fully qualified test method name.
-            Example: MyNamespace.MyClass.MyMethod
+            Fully qualified test method name or short test method name.
+            Example: MyNamespace.MyClass.MyMethod or MyMethod
             """)]
-        string qualifiedMethodName,
-        [Description("Include stack trace in failure details. Default is false.")]
-        bool includeStackTrace = false,
-        [Description("Optional project path to scope the method run to a single test project.")]
-        string? project = null,
-        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
-        string? workingDirectory = null,
+        string testName,
+        [Description("Include stack trace in failure details. Default is false.")] bool includeStackTrace = false,
+        [Description("Optional project path to scope the method run to a single test project.")] string? project = null,
+        [Description("Alias for project, for clients that send projectPath.")] string? projectPath = null,
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")] string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(qualifiedMethodName))
-            throw new ArgumentException(
-                "Qualified method name is required.",
-                nameof(qualifiedMethodName));
+        if (string.IsNullOrWhiteSpace(testName))
+            throw new ArgumentException("Qualified method name is required.", nameof(testName));
 
-        var trimmedQualifiedName = qualifiedMethodName.Trim();
-        var trimmedProject = string.IsNullOrWhiteSpace(project) ? null : project.Trim();
+        var trimmedQualifiedName = testName.Trim();
+        var requestedProject = string.IsNullOrWhiteSpace(project) ? projectPath : project;
+        var trimmedProject = string.IsNullOrWhiteSpace(requestedProject) ? null : requestedProject.Trim();
         var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
 
         if (trimmedProject is null)
         {
-            var projects = await TestProjectDiscovery.ListAsync(
-                _commandRunner,
-                _options,
-                trimmedWorkingDirectory,
-                cancellationToken);
+            var projects = await TestProjectDiscovery.ListAsync(_commandRunner, _options, trimmedWorkingDirectory, cancellationToken);
 
             if (projects.Length > 0)
                 trimmedProject = projects[0];
@@ -82,21 +72,22 @@ public sealed class RunSingleTestTool(
                         ? CtrfTestRun.BuildErrorInfo(
                             runResult.CommandResult,
                             null,
-                            CtrfTestRun.ClassifyErrorKind(runResult.CommandResult, false, null))
+                            CtrfTestRun.ClassifyErrorKind(runResult.CommandResult, false, null),
+                            "run_single_test",
+                            trimmedProject)
                         : null);
             }
 
             if (runResult is { ReportFileFound: false, CommandResult.ExitCode: 8 })
                 return CreateResult(TestOutcome.NotFound, "No tests matched the method filter.");
 
-            var errorKind = CtrfTestRun.ClassifyErrorKind(
-                runResult.CommandResult,
-                runResult.ReportFileFound,
-                runResult.ReadErrorMessage);
+            var errorKind = CtrfTestRun.ClassifyErrorKind(runResult.CommandResult, runResult.ReportFileFound, runResult.ReadErrorMessage);
             var error = CtrfTestRun.BuildErrorInfo(
                 runResult.CommandResult,
                 runResult.ReadErrorMessage,
-                errorKind);
+                errorKind,
+                "run_single_test",
+                trimmedProject);
             return CreateResult(TestOutcome.Error, error.Reason, error: error);
         }
 
@@ -104,17 +95,13 @@ public sealed class RunSingleTestTool(
         if (tests.Count == 0)
             return CreateResult(TestOutcome.NotFound, "No tests matched the method filter.");
 
-        var exactMatches = tests.Where(test
-                => string.Equals(test.Name, trimmedQualifiedName, StringComparison.Ordinal))
-            .ToList();
+        var exactMatches = tests.Where(test => string.Equals(test.Name, trimmedQualifiedName, StringComparison.Ordinal)).ToList();
 
         if (exactMatches.Count == 0)
             return CreateResult(TestOutcome.NotFound, "No tests matched the method filter.");
 
         if (exactMatches.Count > 1)
-            return CreateResult(
-                TestOutcome.Ambiguous,
-                "Filter matched multiple test cases; refine the qualified method name.");
+            return CreateResult(TestOutcome.Ambiguous, "Filter matched multiple test cases; refine the qualified method name.");
 
         var singleResult = exactMatches[0];
         var outcome = MapOutcome(singleResult.Status);
@@ -125,12 +112,8 @@ public sealed class RunSingleTestTool(
 
         if (outcome == TestOutcome.Failed)
         {
-            failureMessage = string.IsNullOrWhiteSpace(singleResult.Message)
-                ? null
-                : singleResult.Message;
-            failureStackTrace = includeStackTrace && !string.IsNullOrWhiteSpace(singleResult.Trace)
-                ? singleResult.Trace
-                : null;
+            failureMessage = string.IsNullOrWhiteSpace(singleResult.Message) ? null : singleResult.Message;
+            failureStackTrace = includeStackTrace && !string.IsNullOrWhiteSpace(singleResult.Trace) ? singleResult.Trace : null;
         }
 
         var message = outcome switch
@@ -141,12 +124,7 @@ public sealed class RunSingleTestTool(
             _ => "Test finished with an unknown outcome.",
         };
 
-        return CreateResult(
-            outcome,
-            message,
-            durationMilliseconds,
-            failureMessage,
-            failureStackTrace);
+        return CreateResult(outcome, message, durationMilliseconds, failureMessage, failureStackTrace);
 
         Result CreateResult(
             TestOutcome resultOutcome,
@@ -154,41 +132,34 @@ public sealed class RunSingleTestTool(
             int? durationMs = null,
             string? resultFailureMessage = null,
             string? resultFailureStackTrace = null,
-            ErrorInfo? error = null)
-            => new(
-                trimmedQualifiedName,
-                resultOutcome,
-                resultMessage,
-                durationMs,
-                resultFailureMessage,
-                resultFailureStackTrace,
-                error);
+            ErrorInfo? error = null) => new(
+            trimmedQualifiedName,
+            resultOutcome,
+            resultMessage,
+            durationMs,
+            resultFailureMessage,
+            resultFailureStackTrace,
+            error);
     }
 
     [Description("Result of running one requested test method.")]
     public record Result(
-        [property: Description("Fully qualified test method name requested.")]
-        string RequestedTestName,
+        [property: Description("Fully qualified test method name requested.")] string RequestedTestName,
         [property: Description("Outcome of the requested single-test run.")] TestOutcome Outcome,
         [property: Description("Short summary (<= 1-2 lines).")] string Message,
-        [property: Description("Test duration in milliseconds when available; otherwise null.")]
-        int? DurationMilliseconds,
-        [property: Description("Failure message when Outcome is Failed; otherwise null.")]
-        string? FailureMessage,
-        [property: Description("Failure stack trace when Outcome is Failed; otherwise null.")]
-        string? FailureStackTrace,
-        [property: Description("Structured error details when Outcome is Error; otherwise null.")]
-        ErrorInfo? Error);
+        [property: Description("Test duration in milliseconds when available; otherwise null.")] int? DurationMilliseconds,
+        [property: Description("Failure message when Outcome is Failed; otherwise null.")] string? FailureMessage,
+        [property: Description("Failure stack trace when Outcome is Failed; otherwise null.")] string? FailureStackTrace,
+        [property: Description("Structured error details when Outcome is Error; otherwise null.")] ErrorInfo? Error);
 
-    private static TestOutcome MapOutcome(string? status)
-        => status?.ToLowerInvariant() switch
-        {
-            "passed" => TestOutcome.Passed,
-            "failed" => TestOutcome.Failed,
-            "skipped" => TestOutcome.Skipped,
-            "pending" => TestOutcome.Skipped,
-            _ => TestOutcome.Error,
-        };
+    private static TestOutcome MapOutcome(string? status) => status?.ToLowerInvariant() switch
+    {
+        "passed" => TestOutcome.Passed,
+        "failed" => TestOutcome.Failed,
+        "skipped" => TestOutcome.Skipped,
+        "pending" => TestOutcome.Skipped,
+        _ => TestOutcome.Error,
+    };
 
     private static int? TryParseDurationMilliseconds(long duration)
     {

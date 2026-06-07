@@ -8,11 +8,7 @@ internal static class CtrfTestRun
 {
     private static readonly TimeSpan DefaultTestRunTimeout = TimeSpan.FromSeconds(180);
 
-    internal sealed record Result(
-        CommandResult CommandResult,
-        CtrfReport? Report,
-        bool ReportFileFound,
-        string? ReadErrorMessage);
+    internal sealed record Result(CommandResult CommandResult, CtrfReport? Report, bool ReportFileFound, string? ReadErrorMessage);
 
     internal sealed record RunOptions(TimeSpan Timeout, int? MaxOutputChars);
 
@@ -20,9 +16,7 @@ internal static class CtrfTestRun
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var timeout = options.TestRunTimeoutSeconds > 0
-            ? TimeSpan.FromSeconds(options.TestRunTimeoutSeconds)
-            : DefaultTestRunTimeout;
+        var timeout = options.TestRunTimeoutSeconds > 0 ? TimeSpan.FromSeconds(options.TestRunTimeoutSeconds) : DefaultTestRunTimeout;
 
         return new RunOptions(timeout, MaxOutputChars: null);
     }
@@ -34,16 +28,15 @@ internal static class CtrfTestRun
         bool disableCtrf,
         McpOptions options,
         string? workingDirectory,
-        CancellationToken cancellationToken)
-        => await ExecuteAsync(
-            commandRunner,
-            jsonOptions,
-            arguments,
-            disableCtrf,
-            supportsCtrf: true,
-            options,
-            workingDirectory,
-            cancellationToken);
+        CancellationToken cancellationToken) => await ExecuteAsync(
+        commandRunner,
+        jsonOptions,
+        arguments,
+        disableCtrf,
+        supportsCtrf: true,
+        options,
+        workingDirectory,
+        cancellationToken);
 
     internal static async Task<Result> ExecuteAsync(
         ICommandRunner commandRunner,
@@ -70,10 +63,7 @@ internal static class CtrfTestRun
         if (!ctrfEnabled || firstAttempt.Report is not null)
             return firstAttempt;
 
-        var firstAttemptKind = ClassifyErrorKind(
-            firstAttempt.CommandResult,
-            firstAttempt.ReportFileFound,
-            firstAttempt.ReadErrorMessage);
+        var firstAttemptKind = ClassifyErrorKind(firstAttempt.CommandResult, firstAttempt.ReportFileFound, firstAttempt.ReadErrorMessage);
 
         if (firstAttemptKind != ErrorKind.InvocationError)
             return firstAttempt;
@@ -114,15 +104,41 @@ internal static class CtrfTestRun
                 "--no-progress",
             ]);
 
-        var commandResult = await commandRunner.RunAsync(
-            new CommandRequest("dotnet", commandArguments.ToArray())
+        CommandResult commandResult;
+        try
+        {
+            commandResult = await commandRunner.RunAsync(
+                new CommandRequest("dotnet", commandArguments.ToArray())
+                {
+                    WorkingDirectory = workingDirectory,
+                    ThrowOnNonZeroExitCode = false,
+                    Timeout = runOptions.Timeout,
+                    MaxOutputChars = runOptions.MaxOutputChars,
+                },
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            commandResult = new CommandResult(
+                -1,
+                string.Empty,
+                string.Empty,
+                [],
+                [],
+                TimeSpan.Zero)
             {
+                FileName = "dotnet",
+                Arguments = commandArguments.ToArray(),
                 WorkingDirectory = workingDirectory,
-                ThrowOnNonZeroExitCode = false,
-                Timeout = runOptions.Timeout,
-                MaxOutputChars = runOptions.MaxOutputChars,
-            },
-            cancellationToken);
+                ExceptionType = exception.GetType().FullName,
+                ExceptionMessage = exception.Message,
+                ExceptionStackTrace = exception.StackTrace,
+            };
+        }
 
         CtrfReport? report = null;
         string? readErrorMessage = null;
@@ -156,20 +172,19 @@ internal static class CtrfTestRun
         return new Result(commandResult, report, reportFileFound, readErrorMessage);
     }
 
-    internal static ErrorKind ClassifyErrorKind(
-        CommandResult commandResult,
-        bool reportFileFound,
-        string? readErrorMessage)
+    internal static ErrorKind ClassifyErrorKind(CommandResult commandResult, bool reportFileFound, string? readErrorMessage)
     {
         if (!string.IsNullOrWhiteSpace(readErrorMessage))
             return ErrorKind.ReadFailed;
 
         var output = BuildOutputCombined(commandResult);
-        if (ContainsErrorToken(
-                output,
-                "Specifying a project for 'dotnet test' should be via '--project'")
+        if (!string.IsNullOrWhiteSpace(commandResult.ExceptionMessage))
+            return ErrorKind.InvocationError;
+
+        if (ContainsErrorToken(output, "Specifying a project for 'dotnet test' should be via '--project'")
             || ContainsErrorToken(output, "Unrecognized command or argument")
-            || ContainsErrorToken(output, "Unknown option"))
+            || ContainsErrorToken(output, "Unknown option")
+            || (ContainsErrorToken(output, "Unknown switch") && ContainsErrorToken(output, "--report-ctrf")))
             return ErrorKind.InvocationError;
 
         if (ContainsErrorToken(output, "testhost")
@@ -177,9 +192,7 @@ internal static class CtrfTestRun
             || ContainsErrorToken(output, "Unhandled exception"))
             return ErrorKind.TestHostCrashed;
 
-        if (ContainsErrorToken(output, "Build FAILED")
-            || ContainsErrorToken(output, "error CS")
-            || ContainsErrorToken(output, "error MSB"))
+        if (ContainsErrorToken(output, "Build FAILED") || ContainsErrorToken(output, "error CS") || ContainsErrorToken(output, "error MSB"))
             return ErrorKind.BuildFailed;
 
         if (ContainsErrorToken(output, "Discovered 0 tests")
@@ -202,7 +215,9 @@ internal static class CtrfTestRun
     internal static ErrorInfo BuildErrorInfo(
         CommandResult commandResult,
         string? readErrorMessage,
-        ErrorKind errorKind)
+        ErrorKind errorKind,
+        string? toolName = null,
+        string? projectPath = null)
     {
         var stderr = string.IsNullOrEmpty(commandResult.StandardError)
             ? null
@@ -223,7 +238,9 @@ internal static class CtrfTestRun
         var reason = readErrorMessage;
         if (string.IsNullOrWhiteSpace(reason))
         {
-            if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
+            if (!string.IsNullOrWhiteSpace(commandResult.ExceptionMessage))
+                reason = commandResult.ExceptionMessage;
+            else if (!string.IsNullOrWhiteSpace(commandResult.StandardError))
                 reason = commandResult.StandardError;
             else if (!string.IsNullOrWhiteSpace(commandResult.StandardOutput))
                 reason = commandResult.StandardOutput;
@@ -231,7 +248,18 @@ internal static class CtrfTestRun
                 reason = "Test execution failed.";
         }
 
-        return new ErrorInfo(errorKind, reason, stdout, stderr);
+        return new ErrorInfo(errorKind, reason, stdout, stderr)
+        {
+            ToolName = toolName,
+            ProjectPath = projectPath,
+            Command = commandResult.FileName,
+            Arguments = commandResult.Arguments,
+            WorkingDirectory = commandResult.WorkingDirectory,
+            ExitCode = commandResult.ExitCode,
+            ExceptionType = commandResult.ExceptionType,
+            ExceptionMessage = commandResult.ExceptionMessage,
+            ExceptionStackTrace = commandResult.ExceptionStackTrace,
+        };
     }
 
     internal static string BuildCommandSummary(CommandResult commandResult)
@@ -253,7 +281,6 @@ internal static class CtrfTestRun
         return duration.Value > int.MaxValue ? int.MaxValue : (int)duration.Value;
     }
 
-
     private static string BuildOutputCombined(CommandResult commandResult)
     {
         if (string.IsNullOrWhiteSpace(commandResult.StandardError))
@@ -262,14 +289,10 @@ internal static class CtrfTestRun
         if (string.IsNullOrWhiteSpace(commandResult.StandardOutput))
             return commandResult.StandardError ?? string.Empty;
 
-        return string.Concat(
-            commandResult.StandardError,
-            Environment.NewLine,
-            commandResult.StandardOutput);
+        return string.Concat(commandResult.StandardError, Environment.NewLine, commandResult.StandardOutput);
     }
 
-    private static bool ContainsErrorToken(string source, string token)
-        => source.Contains(token, StringComparison.OrdinalIgnoreCase);
+    private static bool ContainsErrorToken(string source, string token) => source.Contains(token, StringComparison.OrdinalIgnoreCase);
 
     private static void TryDelete(string path)
     {

@@ -110,7 +110,12 @@ public sealed class ProcessCommandRunner : ICommandRunner
             stderr,
             stdoutLines.ToArray(),
             stderrLines.ToArray(),
-            stopwatch.Elapsed);
+            stopwatch.Elapsed)
+        {
+            FileName = request.FileName,
+            Arguments = request.Arguments ?? [],
+            WorkingDirectory = workingDirectory,
+        };
 
         if (request.ThrowOnNonZeroExitCode && result.ExitCode != 0)
         {

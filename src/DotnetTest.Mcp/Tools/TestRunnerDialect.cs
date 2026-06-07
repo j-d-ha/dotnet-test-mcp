@@ -9,21 +9,14 @@ internal enum TestRunnerDialect
 
 internal static class TestRunnerDialectDetector
 {
-    internal static TestRunnerDialect Detect(
-        string? projectPath,
-        McpOptions options,
-        string? workingDirectory = null)
+    internal static TestRunnerDialect Detect(string? projectPath, McpOptions options, string? workingDirectory = null)
     {
         if (string.IsNullOrWhiteSpace(projectPath))
             return TestRunnerDialect.Unknown;
 
-        var effectiveWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory)
-            ? options.WorkingDirectory
-            : workingDirectory;
+        var effectiveWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? options.WorkingDirectory : workingDirectory;
 
-        var fullPath = Path.IsPathRooted(projectPath)
-            ? projectPath
-            : Path.Combine(effectiveWorkingDirectory, projectPath);
+        var fullPath = Path.IsPathRooted(projectPath) ? projectPath : Path.Combine(effectiveWorkingDirectory, projectPath);
 
         if (!File.Exists(fullPath))
             return TestRunnerDialect.Unknown;
@@ -52,20 +45,13 @@ internal static class TestRunnerDialectDetector
 
 internal static class TestCommandBuilder
 {
-    internal static string[] BuildClassRun(
-        TestRunnerDialect dialect,
-        string className,
-        string? project)
+    internal static string[] BuildClassRun(TestRunnerDialect dialect, string className, string? project)
     {
         if (dialect == TestRunnerDialect.TUnit)
         {
-            var shortClassName = GetTypeName(className);
+            var shortClassName = ExtractTypeName(className);
             var arguments = BuildTestCommandPrefix(dialect, project);
-            arguments.AddRange(
-            [
-                "--treenode-filter",
-                $"/*/*/{shortClassName}/*",
-            ]);
+            arguments.AddRange(["--treenode-filter", $"/*/*/{ValidateTreeNodeSegment(shortClassName, nameof(className))}/*",]);
             return arguments.ToArray();
         }
 
@@ -75,31 +61,23 @@ internal static class TestCommandBuilder
         return ["test", "--filter-class", className];
     }
 
-    internal static string[] BuildSingleTestRun(
-        TestRunnerDialect dialect,
-        string qualifiedMethodName,
-        string? project)
+    internal static string[] BuildSingleTestRun(TestRunnerDialect dialect, string testName, string? project)
     {
         if (dialect == TestRunnerDialect.TUnit)
         {
-            var (className, methodName) = SplitQualifiedMethodName(qualifiedMethodName);
+            var methodName = ExtractMethodName(testName);
             var arguments = BuildTestCommandPrefix(dialect, project);
-            arguments.AddRange(
-            [
-                "--treenode-filter",
-                $"/*/*/{className}/{methodName}",
-            ]);
+            arguments.AddRange(["--treenode-filter", $"/*/*/*/{ValidateTreeNodeSegment(methodName, nameof(testName))}",]);
             return arguments.ToArray();
         }
 
         if (!string.IsNullOrWhiteSpace(project))
-            return ["test", project, "--filter-method", qualifiedMethodName];
+            return ["test", project, "--filter-method", testName];
 
-        return ["test", "--filter-method", qualifiedMethodName];
+        return ["test", "--filter-method", testName];
     }
 
-    internal static string[] BuildProjectRun(TestRunnerDialect dialect, string project)
-        => BuildTestCommandPrefix(dialect, project).ToArray();
+    internal static string[] BuildProjectRun(TestRunnerDialect dialect, string project) => BuildTestCommandPrefix(dialect, project).ToArray();
 
     private static List<string> BuildTestCommandPrefix(TestRunnerDialect dialect, string? project)
     {
@@ -127,22 +105,26 @@ internal static class TestCommandBuilder
         return ["test"];
     }
 
-    private static (string ClassName, string MethodName) SplitQualifiedMethodName(string qualifiedMethodName)
+    private static string ExtractMethodName(string testName)
     {
-        var methodSeparator = qualifiedMethodName.LastIndexOf('.');
-        if (methodSeparator <= 0 || methodSeparator == qualifiedMethodName.Length - 1)
-            return ("*", qualifiedMethodName);
-
-        var methodName = qualifiedMethodName[(methodSeparator + 1)..];
-        var classQualifiedName = qualifiedMethodName[..methodSeparator];
-        return (GetTypeName(classQualifiedName), methodName);
+        var methodSeparator = testName.LastIndexOf('.');
+        return methodSeparator < 0 || methodSeparator == testName.Length - 1 ? testName : testName[(methodSeparator + 1)..];
     }
 
-    private static string GetTypeName(string qualifiedTypeName)
+    private static string ExtractTypeName(string typeName)
     {
-        var classSeparator = qualifiedTypeName.LastIndexOf('.');
-        return classSeparator < 0
-            ? qualifiedTypeName
-            : qualifiedTypeName[(classSeparator + 1)..];
+        var classSeparator = typeName.LastIndexOf('.');
+        return classSeparator < 0 || classSeparator == typeName.Length - 1 ? typeName : typeName[(classSeparator + 1)..];
+    }
+
+    private static string ValidateTreeNodeSegment(string segment, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(segment))
+            throw new ArgumentException("TUnit tree-node filter segment cannot be empty.", parameterName);
+
+        if (segment.Contains('/', StringComparison.Ordinal) || segment.Contains("**", StringComparison.Ordinal))
+            throw new ArgumentException("TUnit tree-node filter segment cannot contain '/' or '**'.", parameterName);
+
+        return segment;
     }
 }
