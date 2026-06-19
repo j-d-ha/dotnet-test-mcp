@@ -13,11 +13,17 @@ public sealed class ListTestProjectsTool(IOptions<McpOptions> options, ICommandR
 
     [McpServerTool(UseStructuredContent = true)]
     [Description("Lists test projects in the solution.")]
-    public async Task<Result> ListTestProjects(CancellationToken cancellationToken = default)
+    public async Task<Result> ListTestProjects(
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
+        string? workingDirectory = null,
+        CancellationToken cancellationToken = default)
     {
+        var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
+
         var testProjects = await TestProjectDiscovery.ListAsync(
             _commandRunner,
             _options,
+            trimmedWorkingDirectory,
             cancellationToken);
         return new Result(testProjects);
     }

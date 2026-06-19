@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using DotnetTest.Mcp.Models;
 using DotnetTest.Mcp.Terminal;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
 
 namespace DotnetTest.Mcp.Tools;
@@ -9,13 +10,15 @@ namespace DotnetTest.Mcp.Tools;
 [McpServerToolType]
 public sealed class RunAllTestsForProjectTool(
     ICommandRunner commandRunner,
-    JsonSerializerOptions jsonOptions)
+    JsonSerializerOptions jsonOptions,
+    IOptions<McpOptions> options)
 {
     private const int MaxFailingTests = 20;
     private const int MaxFailureDetails = 3;
 
     private readonly ICommandRunner _commandRunner = commandRunner.ValidateNotNull();
     private readonly JsonSerializerOptions _jsonOptions = jsonOptions.ValidateNotNull();
+    private readonly McpOptions _options = options.Value.ValidateNotNull();
 
     [McpServerTool(UseStructuredContent = true)]
     [Description("Runs all tests for a single project.")]
@@ -23,22 +26,36 @@ public sealed class RunAllTestsForProjectTool(
         [Description("Path to the project file (.csproj) to test.")] string projectPath,
         [Description("Include stack traces in failure details. Default is false.")]
         bool includeStackTrace = false,
+        [Description("Optional working directory to run dotnet commands from (useful for git worktrees).")]
+        string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(projectPath))
             throw new ArgumentException("Project path is required.", nameof(projectPath));
 
         var trimmedProjectPath = projectPath.Trim();
+        var trimmedWorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory.Trim();
+        var dialect = TestRunnerDialectDetector.Detect(trimmedProjectPath, _options, trimmedWorkingDirectory);
+        var supportsCtrf = dialect != TestRunnerDialect.TUnit;
         var outputOptions = FailureFormatting.CreateOptions(includeStackTrace);
+
+        var arguments = TestCommandBuilder.BuildProjectRun(dialect, trimmedProjectPath);
 
         var runResult = await CtrfTestRun.ExecuteAsync(
             _commandRunner,
             _jsonOptions,
-            ["test", "--project", trimmedProjectPath],
+            arguments,
+            _options.DisableCtrf,
+            supportsCtrf,
+            _options,
+            trimmedWorkingDirectory,
             cancellationToken);
 
         if (runResult.Report is null)
         {
+            if (!supportsCtrf && runResult.CommandResult.ExitCode is 0 or 1)
+                return CreateResultFromConsole(trimmedProjectPath, runResult.CommandResult);
+
             if (runResult is { ReportFileFound: false, CommandResult.ExitCode: 8 })
                 return CreateResult(
                     trimmedProjectPath,
@@ -123,6 +140,34 @@ public sealed class RunAllTestsForProjectTool(
             failureDetails,
             hasMoreFailures,
             error);
+
+    private static Result CreateResultFromConsole(string projectPath, CommandResult commandResult)
+    {
+        var summary = ConsoleTestSummaryParser.Parse(commandResult);
+        var outcome = ConsoleTestSummaryParser.GetOutcome(commandResult, summary);
+        return new Result(
+            "project",
+            projectPath,
+            outcome,
+            ConsoleTestSummaryParser.GetMessage(outcome),
+            commandResult.ExitCode,
+            summary.TestCount,
+            summary.Passed,
+            summary.Failed,
+            summary.Skipped,
+            summary.Pending,
+            summary.Other,
+            summary.DurationMilliseconds,
+            [],
+            [],
+            false,
+            outcome == TestOutcome.Error
+                ? CtrfTestRun.BuildErrorInfo(
+                    commandResult,
+                    null,
+                    CtrfTestRun.ClassifyErrorKind(commandResult, false, null))
+                : null);
+    }
 
     private Result CreateResultFromReport(
         string projectPath,

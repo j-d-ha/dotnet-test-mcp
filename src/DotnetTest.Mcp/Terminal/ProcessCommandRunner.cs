@@ -59,17 +59,34 @@ public sealed class ProcessCommandRunner : ICommandRunner
         var stderrLines = new List<string>();
         string stdout;
         string stderr;
+        var timedOut = false;
 
         try
         {
             var stdoutTask = ReadLinesAsync(process.StandardOutput, stdoutLines, linkedCts.Token);
             var stderrTask = ReadLinesAsync(process.StandardError, stderrLines, linkedCts.Token);
 
-            await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
+            try
+            {
+                await process.WaitForExitAsync(linkedCts.Token).ConfigureAwait(false);
+                await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                                                    && request.Timeout is not null)
+            {
+                timedOut = true;
+                TryKillProcess(process);
+                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                await Task.WhenAll(SuppressCancellationAsync(stdoutTask), SuppressCancellationAsync(stderrTask))
+                    .ConfigureAwait(false);
+            }
 
-            await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
             stdout = string.Join(Environment.NewLine, stdoutLines);
             stderr = string.Join(Environment.NewLine, stderrLines);
+            if (timedOut)
+                stderr = AppendLine(
+                    stderr,
+                    $"Command timed out after {request.Timeout!.Value.TotalSeconds:0.###} seconds.");
         }
         catch (OperationCanceledException)
         {
@@ -93,7 +110,12 @@ public sealed class ProcessCommandRunner : ICommandRunner
             stderr,
             stdoutLines.ToArray(),
             stderrLines.ToArray(),
-            stopwatch.Elapsed);
+            stopwatch.Elapsed)
+        {
+            FileName = request.FileName,
+            Arguments = request.Arguments ?? [],
+            WorkingDirectory = workingDirectory,
+        };
 
         if (request.ThrowOnNonZeroExitCode && result.ExitCode != 0)
         {
@@ -120,6 +142,23 @@ public sealed class ProcessCommandRunner : ICommandRunner
             // Ignored.
         }
     }
+
+    private static async Task SuppressCancellationAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Preserve output captured before the timeout.
+        }
+    }
+
+    private static string AppendLine(string value, string line)
+        => string.IsNullOrWhiteSpace(value)
+            ? line
+            : string.Concat(value, Environment.NewLine, line);
 
     private static async Task ReadLinesAsync(
         StreamReader reader,

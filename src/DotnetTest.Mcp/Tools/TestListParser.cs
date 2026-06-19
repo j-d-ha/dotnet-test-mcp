@@ -24,9 +24,7 @@ internal static class TestListParser
             tests.Add(candidate);
         }
 
-        return tests.Distinct(StringComparer.Ordinal)
-            .OrderBy(value => value, StringComparer.Ordinal)
-            .ToArray();
+        return tests.Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
     }
 
     private static int FindListStartIndex(string[] lines)
@@ -59,9 +57,7 @@ internal static class TestListParser
         if (line.StartsWith("Test discovery completed", StringComparison.OrdinalIgnoreCase))
             return true;
 
-        if (line.StartsWith(
-            "The following Tests are available",
-            StringComparison.OrdinalIgnoreCase))
+        if (line.StartsWith("The following Tests are available", StringComparison.OrdinalIgnoreCase))
             return true;
 
         if (line.StartsWith("Test run for", StringComparison.OrdinalIgnoreCase))
@@ -107,6 +103,7 @@ internal static class TestListParser
         return firstToken ?? string.Empty;
     }
 
-    private static bool LooksLikeTestName(string line)
-        => line.Contains('.', StringComparison.Ordinal);
+    private static bool LooksLikeTestName(string line) => line.Contains('.', StringComparison.Ordinal)
+        || line.Contains('_', StringComparison.Ordinal)
+        || line.Contains('(', StringComparison.Ordinal);
 }
